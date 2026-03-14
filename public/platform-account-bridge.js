@@ -23,6 +23,11 @@
         farmer: null
     };
 
+    function usesSharedAuthBackend() {
+        return FISHER_CONFIG.url === FARMER_CONFIG.url
+            && FISHER_CONFIG.anonKey === FARMER_CONFIG.anonKey;
+    }
+
     function sanitizeText(value) {
         return String(value || '').trim();
     }
@@ -153,10 +158,32 @@
     }
 
     async function getSessionState() {
-        const [fisher, farmer] = await Promise.all([
+        let [fisher, farmer] = await Promise.all([
             readProjectSession('fisher'),
             readProjectSession('farmer')
         ]);
+
+        if (usesSharedAuthBackend()) {
+            const sharedUser = fisher.user || farmer.user || null;
+            const sharedSession = fisher.session || farmer.session || null;
+
+            if (sharedUser) {
+                fisher = {
+                    ...fisher,
+                    ok: true,
+                    user: sharedUser,
+                    session: sharedSession,
+                    error: ''
+                };
+                farmer = {
+                    ...farmer,
+                    ok: true,
+                    user: sharedUser,
+                    session: sharedSession,
+                    error: ''
+                };
+            }
+        }
 
         const primaryUser = fisher.user || farmer.user || null;
         return {
@@ -164,7 +191,9 @@
             farmer,
             primaryUser,
             isSignedIn: Boolean(primaryUser),
-            isFullyLinked: Boolean(fisher.user && farmer.user)
+            isFullyLinked: usesSharedAuthBackend()
+                ? Boolean(primaryUser)
+                : Boolean(fisher.user && farmer.user)
         };
     }
 
@@ -308,18 +337,27 @@
 
     async function signIn(input) {
         const payload = getAuthPayload(input || {});
+        const sharedBackend = usesSharedAuthBackend();
 
-        const [fisherLogin, farmerLogin] = await Promise.all([
-            attemptSignIn('fisher', payload),
-            attemptSignIn('farmer', payload)
-        ]);
+        let fisherLogin;
+        let farmerLogin;
+
+        if (sharedBackend) {
+            fisherLogin = await attemptSignIn('fisher', payload);
+            farmerLogin = { ...fisherLogin, project: 'farmer' };
+        } else {
+            [fisherLogin, farmerLogin] = await Promise.all([
+                attemptSignIn('fisher', payload),
+                attemptSignIn('farmer', payload)
+            ]);
+        }
 
         const warnings = [];
         const recovery = {};
 
         const anyLoginSuccess = fisherLogin.ok || farmerLogin.ok;
 
-        if (anyLoginSuccess && !fisherLogin.ok) {
+        if (!sharedBackend && anyLoginSuccess && !fisherLogin.ok) {
             const provision = await attemptProvision('fisher', payload);
             recovery.fisher = provision;
             if (!provision.ok) {
@@ -331,7 +369,7 @@
             }
         }
 
-        if (anyLoginSuccess && !farmerLogin.ok) {
+        if (!sharedBackend && anyLoginSuccess && !farmerLogin.ok) {
             const provision = await attemptProvision('farmer', payload);
             recovery.farmer = provision;
             if (!provision.ok) {
@@ -384,22 +422,39 @@
 
     async function signUp(input) {
         const payload = getAuthPayload(input || {});
+        const sharedBackend = usesSharedAuthBackend();
 
-        const fisherClient = getClient('fisher');
-        const farmerClient = getClient('farmer');
+        let fisherResult;
+        let farmerResult;
 
-        const [fisherResult, farmerResult] = await Promise.all([
-            fisherClient.auth.signUp({
+        if (sharedBackend) {
+            const fisherClient = getClient('fisher');
+            fisherResult = await fisherClient.auth.signUp({
                 email: payload.email,
                 password: payload.password,
                 options: fisherSignUpOptions(payload.displayName)
-            }),
-            farmerClient.auth.signUp({
-                email: payload.email,
-                password: payload.password,
-                options: farmerSignUpOptions(payload.displayName)
-            })
-        ]);
+            });
+            farmerResult = {
+                data: fisherResult.data,
+                error: fisherResult.error
+            };
+        } else {
+            const fisherClient = getClient('fisher');
+            const farmerClient = getClient('farmer');
+
+            [fisherResult, farmerResult] = await Promise.all([
+                fisherClient.auth.signUp({
+                    email: payload.email,
+                    password: payload.password,
+                    options: fisherSignUpOptions(payload.displayName)
+                }),
+                farmerClient.auth.signUp({
+                    email: payload.email,
+                    password: payload.password,
+                    options: farmerSignUpOptions(payload.displayName)
+                })
+            ]);
+        }
 
         const fisherError = normalizeError(fisherResult.error);
         const farmerError = normalizeError(farmerResult.error);
@@ -422,7 +477,7 @@
         if (fisherResult.error && !isAlreadyRegisteredError(fisherError)) {
             warnings.push(`Virtual Fisher signup issue: ${fisherError}`);
         }
-        if (farmerResult.error && !isAlreadyRegisteredError(farmerError)) {
+        if (!sharedBackend && farmerResult.error && !isAlreadyRegisteredError(farmerError)) {
             warnings.push(`Virtual Farmer signup issue: ${farmerError}`);
         }
 
@@ -442,7 +497,9 @@
             }
         });
         const fisherNeedsVerification = Boolean(fisherResult.data?.user && !fisherResult.data?.session);
-        const farmerNeedsVerification = Boolean(farmerResult.data?.user && !farmerResult.data?.session);
+        const farmerNeedsVerification = sharedBackend
+            ? fisherNeedsVerification
+            : Boolean(farmerResult.data?.user && !farmerResult.data?.session);
 
         if (fisherNeedsVerification || farmerNeedsVerification) {
             warnings.push('Check your email to verify account access before full sync is available.');
@@ -457,19 +514,24 @@
     }
 
     async function signOut() {
-        const fisherClient = getClient('fisher');
-        const farmerClient = getClient('farmer');
+        if (usesSharedAuthBackend()) {
+            const fisherClient = getClient('fisher');
+            await fisherClient.auth.signOut();
+        } else {
+            const fisherClient = getClient('fisher');
+            const farmerClient = getClient('farmer');
 
-        await Promise.allSettled([
-            fisherClient.auth.signOut(),
-            farmerClient.auth.signOut()
-        ]);
+            await Promise.allSettled([
+                fisherClient.auth.signOut(),
+                farmerClient.auth.signOut()
+            ]);
+        }
 
         return getSessionState();
     }
 
     window.PlatformAccountBridge = {
-        version: '2026-03-14b',
+        version: '2026-03-15a',
         getSessionState,
         signIn,
         signUp,
