@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sign in to Virtual Farmer and keep your progress synced in the cloud.">
+    <title>Virtual Farmer | Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="auth.css?v=20260314c">
+</head>
+
+<body data-auth-mode="login">
+    <main class="auth-shell">
+        <section class="auth-hero">
+            <div>
+                <p class="auth-kicker">Virtual Farmer Cloud</p>
+                <h1 class="auth-title">Sign in and keep every harvest synced.</h1>
+                <p class="auth-copy">
+                    Track inventory, upgrades, achievements, and stats in the cloud so your farm follows you across devices.
+                </p>
+            </div>
+            <ul class="auth-list">
+                <li>Secure email account login</li>
+                <li>Automatic cloud saves for game progress</li>
+                <li>Global leaderboard for plants, balance, and XP</li>
+            </ul>
+        </section>
+
+        <section class="auth-card">
+            <h1>Login</h1>
+            <p class="auth-subtitle">Enter your account credentials to resume your farm.</p>
+
+            <form class="auth-form" id="login-form" novalidate>
+                <div class="auth-field">
+                    <label for="login-email">Email</label>
+                    <input id="login-email" name="email" type="email" autocomplete="email" required>
+                </div>
+
+                <div class="auth-field">
+                    <label for="login-password">Password</label>
+                    <div class="auth-password-input">
+                        <input id="login-password" name="password" type="password" minlength="8" autocomplete="current-password" required>
+                        <button
+                            class="auth-password-toggle"
+                            type="button"
+                            data-password-toggle="login-password"
+                            aria-label="Show password"
+                            aria-pressed="false">
+                            Show
+                        </button>
+                    </div>
+
+                    <p class="password-strength" id="login-password-strength" aria-live="polite"></p>
+
+                    <ul class="password-checklist" id="login-password-checklist">
+                        <li class="is-pending" data-password-rule="uppercase" aria-checked="false">Uppercase letter</li>
+                        <li class="is-pending" data-password-rule="lowercase" aria-checked="false">Lowercase letter</li>
+                        <li class="is-pending" data-password-rule="number" aria-checked="false">Number</li>
+                        <li class="is-pending" data-password-rule="special" aria-checked="false">Special character (e.g. !?<>@#$%)</li>
+                        <li class="is-pending" data-password-rule="minLength" aria-checked="false">8 characters or more</li>
+                    </ul>
+                </div>
+
+                <button class="auth-btn" type="submit">Enter Farm Console</button>
+            </form>
+
+            <p class="auth-status" id="auth-status" aria-live="polite"></p>
+
+            <div class="auth-links">
+                <span>Need an account?</span>
+                <a id="link-signup" href="signup.html">Create one</a>
+            </div>
+
+            <p class="auth-footnote">
+                Authentication settings are loaded from your local project config.
+            </p>
+        </section>
+    </main>
+
+    <script src="/vendor/supabase/supabase.js?v=20260314a"></script>
+    <script src="/platform-account-bridge.js"></script>
+    <script src="supabase/config.js?v=20260314a"></script>
+    <script src="supabase/client.js?v=20260314a"></script>
+    <script src="auth.js?v=20260314d"></script>
+</body>
+
+</html>

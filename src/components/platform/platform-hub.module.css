@@ -1,0 +1,248 @@
+.shell {
+  width: min(1160px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 0.95rem;
+  color: #17203a;
+}
+
+.hero {
+  border: 1px solid rgba(23, 35, 66, 0.2);
+  border-radius: 28px;
+  background: rgba(255, 250, 242, 0.88);
+  padding: clamp(0.95rem, 2.5vw, 1.5rem);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--font-display), "Georgia", serif;
+  font-size: clamp(1.7rem, 4.2vw, 2.8rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0;
+  color: #405478;
+  max-width: 68ch;
+}
+
+.kicker,
+.cardKicker {
+  margin: 0;
+  font-family: var(--font-mono), "Cascadia Mono", monospace;
+  font-size: 0.73rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #46617f;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: 1.3fr 1fr;
+}
+
+.accountCard,
+.gameCard {
+  border: 1px solid rgba(23, 35, 66, 0.2);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.accountCard {
+  grid-row: span 2;
+}
+
+.accountHead {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.accountEmail {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.modeBtn {
+  border-radius: 11px;
+  border: 1px solid rgba(28, 41, 73, 0.2);
+  background: #fff;
+  color: #213453;
+  padding: 0.52rem 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeBtnActive {
+  background: linear-gradient(115deg, #fac381, #efad67);
+  border-color: #d89653;
+}
+
+.form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.form span {
+  font-size: 0.76rem;
+  font-family: var(--font-mono), "Cascadia Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4d6489;
+}
+
+.form input {
+  border-radius: 11px;
+  border: 1px solid rgba(25, 40, 73, 0.2);
+  background: #fff;
+  color: #1e2f4f;
+  font-size: 0.92rem;
+  padding: 0.58rem 0.7rem;
+}
+
+.form input:focus-visible,
+.modeBtn:focus-visible,
+.btnPrimary:focus-visible,
+.btnGhost:focus-visible,
+.btnDanger:focus-visible {
+  outline: 2px solid #3f689a;
+  outline-offset: 1px;
+}
+
+.statusRow {
+  border: 1px solid rgba(29, 45, 82, 0.2);
+  border-radius: 14px;
+  padding: 0.62rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(246, 250, 255, 0.85);
+}
+
+.statusRow[data-tone="success"] {
+  background: rgba(228, 247, 237, 0.92);
+  border-color: rgba(32, 117, 67, 0.3);
+}
+
+.statusRow[data-tone="error"] {
+  background: rgba(255, 236, 232, 0.95);
+  border-color: rgba(172, 60, 49, 0.3);
+}
+
+.statusRow p {
+  margin: 0;
+  color: #2e4267;
+  flex: 1 1 220px;
+}
+
+.linkStateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.linkState {
+  border: 1px dashed rgba(42, 57, 93, 0.26);
+  border-radius: 14px;
+  padding: 0.58rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.linkState h3,
+.linkState p,
+.gameCard h2,
+.gameCard p {
+  margin: 0;
+}
+
+.linkState h3,
+.gameCard h2 {
+  font-family: var(--font-display), "Georgia", serif;
+  letter-spacing: -0.02em;
+}
+
+.gameCard p {
+  color: #42577e;
+  line-height: 1.5;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.btnPrimary,
+.btnGhost,
+.btnDanger {
+  border-radius: 11px;
+  border: 1px solid transparent;
+  padding: 0.55rem 0.85rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 160ms ease;
+}
+
+.btnPrimary:hover,
+.btnGhost:hover,
+.btnDanger:hover {
+  transform: translateY(-1px);
+}
+
+.btnPrimary {
+  background: linear-gradient(118deg, #f6c07c, #eba863);
+  border-color: #d2924e;
+  color: #1b2c49;
+}
+
+.btnGhost {
+  background: #fff;
+  border-color: rgba(30, 46, 82, 0.2);
+  color: #223757;
+}
+
+.btnDanger {
+  background: #fbe8e5;
+  border-color: rgba(168, 55, 44, 0.36);
+  color: #8f2f27;
+}
+
+@media (max-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .accountCard {
+    grid-row: auto;
+  }
+}

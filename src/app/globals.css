@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #071126;
+  --bg-soft: #0d1a35;
+  --card: #12213f;
+  --text: #e5eefc;
+  --muted: #9eb3d9;
+  --accent: #22d3ee;
+  --accent-strong: #06b6d4;
+  --border: rgba(158, 179, 217, 0.22);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: radial-gradient(circle at 10% 10%, #16305c 0%, rgba(22, 48, 92, 0) 38%),
+    radial-gradient(circle at 90% 0%, #11294f 0%, rgba(17, 41, 79, 0) 34%),
+    linear-gradient(140deg, var(--bg), var(--bg-soft));
+  color: var(--text);
+  font-family: "Manrope", "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  width: min(1080px, 94vw);
+  margin: 1.6rem auto;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.app-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(10, 26, 54, 0.86);
+  padding: 1.1rem;
+}
+
+.app-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  letter-spacing: -0.02em;
+}
+
+.app-subtitle {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  border: 1px solid var(--accent);
+  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
+  color: #032531;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.56rem 0.8rem;
+  cursor: pointer;
+}
+
+.app-btn.secondary {
+  border-color: var(--border);
+  color: var(--text);
+  background: rgba(15, 32, 66, 0.8);
+}
+
+.play-host {
+  width: min(1360px, 98vw);
+  margin: 0.4rem auto;
+}
+
+.play-runtime {
+  position: relative;
+  min-height: 100dvh;
+}
+
+.play-root {
+  width: 100%;
+  min-height: 100dvh;
+  border: 0;
+  display: block;
+  background: #ffffff;
+}
+
+.play-loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
+  background:
+    radial-gradient(circle at 10% 10%, #d6eef8 0%, rgba(214, 238, 248, 0) 44%),
+    linear-gradient(120deg, #e8f4fb, #f5f7fc);
+  z-index: 20;
+}
+
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.leaderboard-list {
+  margin: 0.7rem 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.leaderboard-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+
+.leaderboard-list b {
+  color: var(--text);
+}
+
+.leaderboard-live-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.callback-wrap {
+  width: min(600px, 94vw);
+  margin: 3rem auto;
+}
+
+.callback-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.callback-card.is-success {
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+.callback-status {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+@media (max-width: 860px) {
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,229 @@
+.page {
+  --ink: #172034;
+  --ink-soft: #3f5072;
+  --panel: rgba(255, 250, 240, 0.86);
+  --line: rgba(29, 40, 70, 0.24);
+  --brand-1: #f0b874;
+  --brand-2: #66b9cf;
+
+  min-height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1rem, 2vw, 1.7rem);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 8% 8%, rgba(235, 163, 82, 0.34), rgba(235, 163, 82, 0) 34%),
+    radial-gradient(circle at 92% 0%, rgba(83, 181, 205, 0.3), rgba(83, 181, 205, 0) 37%),
+    linear-gradient(125deg, #fdf7ec, #edf6fc 58%, #f8eee2);
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image: radial-gradient(circle at 20% 25%, rgba(17, 29, 54, 0.15) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.topbar {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  padding: 0.4rem 0.45rem 0.4rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-mono), "Cascadia Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.topCta {
+  border-radius: 999px;
+  border: 1px solid rgba(24, 36, 69, 0.2);
+  padding: 0.5rem 0.95rem;
+  font-weight: 700;
+  font-size: 0.84rem;
+  background: #fff;
+}
+
+.hero {
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: var(--panel);
+  padding: clamp(1rem, 3.3vw, 2.3rem);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--font-mono), "Cascadia Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #38567b;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--font-display), "Georgia", serif;
+  font-size: clamp(1.8rem, 5vw, 3.4rem);
+  line-height: 1.03;
+  letter-spacing: -0.025em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 63ch;
+  color: var(--ink-soft);
+  font-size: clamp(1rem, 1.7vw, 1.16rem);
+  line-height: 1.55;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.62rem 1rem;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  font-weight: 800;
+  font-size: 0.88rem;
+  transition: transform 160ms ease;
+  white-space: nowrap;
+}
+
+.primary:hover,
+.secondary:hover {
+  transform: translateY(-1px);
+}
+
+.primary {
+  background: linear-gradient(120deg, var(--brand-1), #e6a15a);
+  border-color: #cb8d4f;
+}
+
+.secondary {
+  background: #fff;
+  border-color: rgba(29, 43, 77, 0.2);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 1rem;
+  background: var(--panel);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cardTag {
+  margin: 0;
+  font-family: var(--font-mono), "Cascadia Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #466187;
+}
+
+.card h2 {
+  margin: 0;
+  font-family: var(--font-display), "Georgia", serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+  line-height: 1.16;
+}
+
+.card p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.footerCta {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 1rem;
+  background: linear-gradient(120deg, rgba(249, 232, 201, 0.9), rgba(233, 246, 252, 0.9));
+  display: grid;
+  gap: 0.6rem;
+}
+
+.footerCta h2 {
+  margin: 0;
+  font-family: var(--font-display), "Georgia", serif;
+  font-size: clamp(1.25rem, 2.7vw, 1.9rem);
+}
+
+.footerCta p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 860px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    border-radius: 18px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding: 0.7rem;
+  }
+
+  .topCta {
+    width: 100%;
+  }
+
+  .heroActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .primary,
+  .secondary {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1280px) {
+  .heroActions {
+    flex-wrap: wrap;
+  }
+
+  .primary,
+  .secondary {
+    flex: 1 1 220px;
+  }
+}
