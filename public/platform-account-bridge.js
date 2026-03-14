@@ -2,15 +2,15 @@
     const FISHER_CONFIG = {
         name: 'fisher',
         label: 'Virtual Fisher',
-        url: 'https://wlyrmqfaiixoohdyizam.supabase.co',
-        anonKey: 'sb_publishable_h3m3EuajBFphREc0LpVN3g_PWcWv9gM'
+        url: 'https://clgzhgczlafvuagbwapk.supabase.co',
+        anonKey: 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo'
     };
 
     const FARMER_CONFIG = {
         name: 'farmer',
         label: 'Virtual Farmer',
-        url: 'https://nunhsqvospdmtyrceljr.supabase.co',
-        anonKey: 'sb_publishable_8xg5zRZch29kT_wVLQJgEA_GoL7WQZl'
+        url: 'https://clgzhgczlafvuagbwapk.supabase.co',
+        anonKey: 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo'
     };
 
     const PROJECTS = {

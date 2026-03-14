@@ -3,8 +3,8 @@
  * Handles auth/session, cloud save, and security alert reporting.
  */
 
-const SUPABASE_URL = 'https://wlyrmqfaiixoohdyizam.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_h3m3EuajBFphREc0LpVN3g_PWcWv9gM';
+const SUPABASE_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
 const ALERT_FUNCTION_URL = '/api/alerts';
 
 const cloudSupabaseClient = (window.supabase && typeof window.supabase.createClient === 'function')

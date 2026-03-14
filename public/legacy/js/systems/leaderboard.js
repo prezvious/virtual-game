@@ -6,8 +6,8 @@
 (function () {
     if (typeof CloudSystem === 'undefined') return;
 
-    const FALLBACK_URL = 'https://wlyrmqfaiixoohdyizam.supabase.co';
-    const FALLBACK_KEY = 'sb_publishable_h3m3EuajBFphREc0LpVN3g_PWcWv9gM';
+    const FALLBACK_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
+    const FALLBACK_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
     const PROJECT_URL = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : FALLBACK_URL;
     const PROJECT_KEY = typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : FALLBACK_KEY;
     const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{2,19}$/;
