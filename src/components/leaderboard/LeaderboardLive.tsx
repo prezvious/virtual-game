@@ -87,7 +87,7 @@ export default function LeaderboardLive({ initialModel }: Props) {
   return (
     <div className={styles.shell}>
       <section className={styles.intro}>
-        <h1 className={styles.title}>Global Leaderboards</h1>
+        <h1 className={styles.title}>Leaderboard</h1>
         <p className={styles.subtitle}>
           {model.error
             ? `Leaderboard unavailable: ${model.error}`

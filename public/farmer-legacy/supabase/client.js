@@ -468,7 +468,56 @@
         return Array.isArray(data) ? data : [];
     }
 
-    async function fetchLeaderboardBundle(limit = 10) {
+    function looksLikeMissingRpc(error, fnName) {
+        const code = String(error?.code || "").toUpperCase();
+        const message = String(error?.message || "").toLowerCase();
+        const loweredFn = String(fnName || "").toLowerCase();
+        return code === "PGRST202"
+            || code === "42883"
+            || (loweredFn
+                && message.includes(loweredFn)
+                && (message.includes("does not exist") || message.includes("could not find")));
+    }
+
+    async function requestLeaderboardRefresh() {
+        const supabaseClient = getClientOrThrow();
+        const { data, error } = await supabaseClient.rpc("request_farmer_leaderboard_refresh");
+        if (error) {
+            if (looksLikeMissingRpc(error, "request_farmer_leaderboard_refresh")) {
+                return { ok: false, refreshed: false, unsupported: true, reason: error.message || "Refresh RPC missing." };
+            }
+            throw error;
+        }
+        return data && typeof data === "object" ? data : { ok: true, refreshed: false };
+    }
+
+    function getBundleRefreshedAt(rowsByMetric, rpcRefreshData) {
+        const rpcRefreshedAt = String(rpcRefreshData?.refreshed_at || "").trim();
+        if (rpcRefreshedAt) return rpcRefreshedAt;
+
+        const allRows = Array.isArray(rowsByMetric) ? rowsByMetric.flat() : [];
+        let latest = 0;
+        allRows.forEach((row) => {
+            const ts = Date.parse(String(row?.updated_at || ""));
+            if (Number.isFinite(ts)) latest = Math.max(latest, ts);
+        });
+
+        return latest > 0 ? new Date(latest).toISOString() : "";
+    }
+
+    async function fetchLeaderboardBundle(limit = 10, options = {}) {
+        const opts = options && typeof options === "object" ? options : {};
+        const forceRefresh = opts.forceRefresh === true;
+        let refreshResult = null;
+
+        if (forceRefresh) {
+            try {
+                refreshResult = await requestLeaderboardRefresh();
+            } catch (refreshError) {
+                console.warn("Global leaderboard refresh request failed:", refreshError);
+            }
+        }
+
         const [mostPlants, highestBalance, highestXP] = await Promise.all([
             fetchLeaderboard("total_plants", limit),
             fetchLeaderboard("balance", limit),
@@ -478,7 +527,8 @@
         return {
             mostPlants,
             highestBalance,
-            highestXP
+            highestXP,
+            refreshedAt: getBundleRefreshedAt([mostPlants, highestBalance, highestXP], refreshResult)
         };
     }
 

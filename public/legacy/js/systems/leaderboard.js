@@ -17,8 +17,9 @@
         'supabase', 'postgres', 'root', 'null', 'undefined',
         'fishit', 'virtualfisher'
     ]);
-    const LEADERBOARD_REFRESH_MS = 10 * 60 * 1000;
+    const LEADERBOARD_REFRESH_MS = 20 * 60 * 1000;
     const LEADERBOARD_ENTRY_LIMIT = 10;
+    const LEADERBOARD_FETCH_TIMEOUT_MS = 12000;
 
     const extensionSupabaseClient = (typeof cloudSupabaseClient !== 'undefined' && cloudSupabaseClient)
         ? cloudSupabaseClient
@@ -429,12 +430,23 @@
     };
 
     CloudSystem._fetchLeaderboardRows = async function () {
-        return extensionSupabaseClient
+        const requestPromise = extensionSupabaseClient
             .from('leaderboard_snapshots')
             .select('metric, rank, username, score, refreshed_at')
             .lte('rank', LEADERBOARD_ENTRY_LIMIT)
             .order('metric', { ascending: true })
             .order('rank', { ascending: true });
+
+        const timeoutPromise = new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({
+                    data: null,
+                    error: { message: 'Leaderboard request timed out.' }
+                });
+            }, LEADERBOARD_FETCH_TIMEOUT_MS);
+        });
+
+        return Promise.race([requestPromise, timeoutPromise]);
     };
 
     CloudSystem._parseLeaderboardScore = function (value) {
@@ -650,14 +662,14 @@
             this._renderLeaderboardRows('leaderboard-fish-list', fishRows);
 
             if (rows.length === 0) {
-                this._setLeaderboardMeta('No leaderboard entries yet. Snapshots update every 10 minutes.');
+                this._setLeaderboardMeta('No leaderboard entries yet. Snapshots update every 20 minutes.');
                 this._updateLeaderboardUserNote();
                 return;
             }
 
             const refreshedAt = latestRefreshedAtMs > 0 ? new Date(latestRefreshedAtMs) : new Date();
             this.lastLeaderboardRefreshedAt = refreshedAt.getTime();
-            this._setLeaderboardMeta(`Last updated: ${refreshedAt.toLocaleString('en-US')} (refreshes every 10 minutes)`);
+            this._setLeaderboardMeta(`Last updated: ${refreshedAt.toLocaleString('en-US')} (refreshes every 20 minutes)`);
             this._updateLeaderboardUserNote();
         } catch (err) {
             this._setLeaderboardMeta(`Leaderboard update failed: ${err?.message || 'Unknown error'}`);

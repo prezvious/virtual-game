@@ -25,6 +25,7 @@ const leaderboardState = {
     mostPlants: [],
     highestBalance: [],
     highestXP: [],
+    snapshotRefreshedAt: "",
     loadedAt: 0,
     loading: false
 };
@@ -689,6 +690,13 @@ function updateLeaderboardPage() {
 
     const stampEl = document.getElementById("leaderboard-last-updated");
     if (!stampEl) return;
+
+    const snapshotUpdatedMs = Date.parse(String(leaderboardState.snapshotRefreshedAt || ""));
+    if (Number.isFinite(snapshotUpdatedMs)) {
+        stampEl.textContent = `Last updated: ${new Date(snapshotUpdatedMs).toLocaleString()}`;
+        return;
+    }
+
     if (!leaderboardState.loadedAt) {
         stampEl.textContent = "Last updated: not loaded yet";
         return;
@@ -713,10 +721,15 @@ async function refreshLeaderboard({ force = false } = {}) {
     leaderboardState.loading = true;
 
     try {
-        const bundle = await supabaseApi.fetchLeaderboardBundle(10);
+        if (force && typeof supabaseApi.flushQueuedSave === "function") {
+            await supabaseApi.flushQueuedSave();
+        }
+
+        const bundle = await supabaseApi.fetchLeaderboardBundle(10, { forceRefresh: force === true });
         leaderboardState.mostPlants = Array.isArray(bundle.mostPlants) ? bundle.mostPlants : [];
         leaderboardState.highestBalance = Array.isArray(bundle.highestBalance) ? bundle.highestBalance : [];
         leaderboardState.highestXP = Array.isArray(bundle.highestXP) ? bundle.highestXP : [];
+        leaderboardState.snapshotRefreshedAt = String(bundle?.refreshedAt || "").trim();
         leaderboardState.loadedAt = Date.now();
         updateLeaderboardPage();
     } catch (error) {
