@@ -247,9 +247,11 @@
 
             const bridgeState = bridgeResult.state || await readBridgeState(accountBridge);
             const farmerUser = bridgeState?.farmer?.user || null;
+            const farmerSession = bridgeState?.farmer?.session || null;
             setActiveUser(farmerUser);
 
-            if (farmerUser) {
+            // Avoid profile reads until the user has an authenticated session token.
+            if (farmerUser && farmerSession) {
                 try {
                     await loadProfile();
                 } catch (profileError) {
@@ -259,8 +261,8 @@
 
             return {
                 user: farmerUser,
-                session: bridgeState?.farmer?.session || null,
-                requiresVerification: Boolean(bridgeResult.requiresVerification || !bridgeState?.farmer?.session)
+                session: farmerSession,
+                requiresVerification: Boolean(bridgeResult.requiresVerification || !farmerSession)
             };
         }
 
