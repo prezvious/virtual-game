@@ -49,8 +49,8 @@ export default function LandingPage() {
         </section>
 
         <section className={styles.columns}>
-          <article className={styles.card}>
-            <p className={styles.cardTag}>Virtual Fisher</p>
+          <article className={styles.column}>
+            <p className={styles.columnTag}>Virtual Fisher</p>
             <h2>High-tempo biome fishing with cloud sync.</h2>
             <p>
               Keep your rods, baits, combo routes, and leaderboard climb in the same account context as
@@ -58,8 +58,8 @@ export default function LandingPage() {
             </p>
           </article>
 
-          <article className={styles.card}>
-            <p className={styles.cardTag}>Virtual Farmer</p>
+          <article className={styles.column}>
+            <p className={styles.columnTag}>Virtual Farmer</p>
             <h2>Progression farming loops with prestige depth.</h2>
             <p>
               Preserve your inventory, upgrades, auto-farm cycles, and cloud snapshots while operating from

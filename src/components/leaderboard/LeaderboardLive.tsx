@@ -28,8 +28,8 @@ function LeaderboardColumn({
   toneClass: string;
 }) {
   return (
-    <article className={`${styles.boardCard} ${toneClass}`}>
-      <h2 className={styles.cardTitle}>{title}</h2>
+    <article className={`${styles.boardColumn} ${toneClass}`}>
+      <h2 className={styles.columnTitle}>{title}</h2>
       <ol className={styles.list}>
         {entries.length ? (
           entries.map((row) => (
@@ -106,13 +106,13 @@ export default function LeaderboardLive({ initialModel }: Props) {
           title="Most Money Earned"
           entries={model.money}
           emptyLabel="No entries yet."
-          toneClass={styles.moneyCard}
+          toneClass={styles.moneyTone}
         />
         <LeaderboardColumn
           title="Most Fish Caught"
           entries={model.fish}
           emptyLabel="No entries yet."
-          toneClass={styles.fishCard}
+          toneClass={styles.fishTone}
         />
       </section>
 

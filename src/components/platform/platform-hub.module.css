@@ -1,16 +1,16 @@
 .shell {
-  width: min(1160px, 100%);
+  --divider: rgba(23, 35, 66, 0.14);
+
+  width: min(880px, 100%);
   margin: 0 auto;
-  display: grid;
-  gap: 0.95rem;
   color: #17203a;
 }
 
+/* ── hero ────────────────────────────────────────── */
+
 .hero {
-  border: 1px solid rgba(23, 35, 66, 0.2);
-  border-radius: 28px;
-  background: rgba(255, 250, 242, 0.88);
-  padding: clamp(0.95rem, 2.5vw, 1.5rem);
+  padding-bottom: clamp(1.5rem, 3vw, 2.2rem);
+  border-bottom: 1px solid var(--divider);
   display: grid;
   gap: 0.9rem;
 }
@@ -30,7 +30,7 @@
 }
 
 .kicker,
-.cardKicker {
+.sectionLabel {
   margin: 0;
   font-family: var(--font-mono), "Cascadia Mono", monospace;
   font-size: 0.73rem;
@@ -45,24 +45,18 @@
   gap: 0.55rem;
 }
 
+/* ── layout sections ─────────────────────────────── */
+
 .grid {
   display: grid;
-  gap: 0.85rem;
-  grid-template-columns: 1.3fr 1fr;
+  gap: 0;
 }
 
-.accountCard,
-.gameCard {
-  border: 1px solid rgba(23, 35, 66, 0.2);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 1rem;
+.accountSection {
+  padding: clamp(1.5rem, 3vw, 2.2rem) 0;
+  border-bottom: 1px solid var(--divider);
   display: grid;
-  gap: 0.8rem;
-}
-
-.accountCard {
-  grid-row: span 2;
+  gap: 1rem;
 }
 
 .accountHead {
@@ -80,16 +74,22 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
+  max-width: 320px;
 }
 
 .modeBtn {
-  border-radius: 11px;
-  border: 1px solid rgba(28, 41, 73, 0.2);
-  background: #fff;
+  border-radius: 8px;
+  border: 1px solid rgba(28, 41, 73, 0.18);
+  background: transparent;
   color: #213453;
   padding: 0.52rem 0.7rem;
   font-weight: 700;
   cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.modeBtn:hover {
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .modeBtnActive {
@@ -97,9 +97,14 @@
   border-color: #d89653;
 }
 
+.modeBtnActive:hover {
+  background: linear-gradient(115deg, #fac381, #efad67);
+}
+
 .form {
   display: grid;
   gap: 0.6rem;
+  max-width: 420px;
 }
 
 .form label {
@@ -116,9 +121,9 @@
 }
 
 .form input {
-  border-radius: 11px;
-  border: 1px solid rgba(25, 40, 73, 0.2);
-  background: #fff;
+  border-radius: 8px;
+  border: 1px solid rgba(25, 40, 73, 0.18);
+  background: rgba(255, 255, 255, 0.6);
   color: #1e2f4f;
   font-size: 0.92rem;
   padding: 0.58rem 0.7rem;
@@ -133,26 +138,24 @@
   outline-offset: 1px;
 }
 
+/* ── status row ──────────────────────────────────── */
+
 .statusRow {
-  border: 1px solid rgba(29, 45, 82, 0.2);
-  border-radius: 14px;
-  padding: 0.62rem;
+  padding: 0.62rem 0;
+  border-top: 1px dashed rgba(29, 45, 82, 0.15);
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
   align-items: center;
   justify-content: space-between;
-  background: rgba(246, 250, 255, 0.85);
 }
 
-.statusRow[data-tone="success"] {
-  background: rgba(228, 247, 237, 0.92);
-  border-color: rgba(32, 117, 67, 0.3);
+.statusRow[data-tone="success"] p {
+  color: #1a7a42;
 }
 
-.statusRow[data-tone="error"] {
-  background: rgba(255, 236, 232, 0.95);
-  border-color: rgba(172, 60, 49, 0.3);
+.statusRow[data-tone="error"] p {
+  color: #a33c2f;
 }
 
 .statusRow p {
@@ -161,48 +164,95 @@
   flex: 1 1 220px;
 }
 
+/* ── link state ──────────────────────────────────── */
+
 .linkStateGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
 }
 
 .linkState {
-  border: 1px dashed rgba(42, 57, 93, 0.26);
-  border-radius: 14px;
-  padding: 0.58rem;
+  padding: 0.58rem 0;
   display: grid;
-  gap: 0.25rem;
+  gap: 0.2rem;
+}
+
+.linkState:first-child {
+  padding-right: 1rem;
+  border-right: 1px solid var(--divider);
+}
+
+.linkState:last-child {
+  padding-left: 1rem;
 }
 
 .linkState h3,
-.linkState p,
-.gameCard h2,
-.gameCard p {
+.linkState p {
   margin: 0;
 }
 
-.linkState h3,
-.gameCard h2 {
+.linkState h3 {
+  font-family: var(--font-display), "Georgia", serif;
+  letter-spacing: -0.02em;
+  font-size: 0.95rem;
+}
+
+.linkState p {
+  color: #5a6e8f;
+  font-size: 0.88rem;
+}
+
+/* ── game sections ───────────────────────────────── */
+
+.gameColumns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.gameSection {
+  padding: clamp(1.5rem, 3vw, 2.2rem) 0;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.gameSection:first-child {
+  padding-right: clamp(1.2rem, 3vw, 2rem);
+  border-right: 1px solid var(--divider);
+}
+
+.gameSection:last-child {
+  padding-left: clamp(1.2rem, 3vw, 2rem);
+}
+
+.gameSection h2 {
+  margin: 0;
   font-family: var(--font-display), "Georgia", serif;
   letter-spacing: -0.02em;
 }
 
-.gameCard p {
+.gameSection p {
+  margin: 0;
   color: #42577e;
   line-height: 1.5;
 }
 
-.cardActions {
+.sectionActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+  padding-top: 0.3rem;
 }
+
+/* ── buttons ─────────────────────────────────────── */
 
 .btnPrimary,
 .btnGhost,
 .btnDanger {
-  border-radius: 11px;
+  border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.55rem 0.85rem;
   font-weight: 800;
@@ -211,6 +261,7 @@
   align-items: center;
   justify-content: center;
   transition: transform 160ms ease;
+  cursor: pointer;
 }
 
 .btnPrimary:hover,
@@ -226,23 +277,56 @@
 }
 
 .btnGhost {
-  background: #fff;
-  border-color: rgba(30, 46, 82, 0.2);
+  background: transparent;
+  border-color: rgba(30, 46, 82, 0.18);
   color: #223757;
 }
 
 .btnDanger {
-  background: #fbe8e5;
-  border-color: rgba(168, 55, 44, 0.36);
+  background: transparent;
+  border: none;
+  color: #a33c2f;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0.55rem 0.2rem;
+}
+
+.btnDanger:hover {
+  transform: none;
   color: #8f2f27;
 }
 
-@media (max-width: 980px) {
-  .grid {
+@media (max-width: 700px) {
+  .gameColumns {
     grid-template-columns: 1fr;
   }
 
-  .accountCard {
-    grid-row: auto;
+  .gameSection:first-child {
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--divider);
+    padding-bottom: clamp(1.2rem, 3vw, 2rem);
+  }
+
+  .gameSection:last-child {
+    padding-left: 0;
+    padding-top: clamp(1.2rem, 3vw, 2rem);
+  }
+
+  .linkStateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .linkState:first-child {
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--divider);
+    padding-bottom: 0.5rem;
+  }
+
+  .linkState:last-child {
+    padding-left: 0;
+    padding-top: 0.5rem;
   }
 }

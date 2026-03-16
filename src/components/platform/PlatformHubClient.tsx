@@ -294,10 +294,10 @@ export default function PlatformHubClient() {
         </div>
       </section>
 
-      <section className={styles.grid}>
-        <article className={styles.accountCard}>
+      <div className={styles.grid}>
+        <section className={styles.accountSection}>
           <div className={styles.accountHead}>
-            <p className={styles.cardKicker}>Account Center</p>
+            <p className={styles.sectionLabel}>Account Center</p>
             <p className={styles.accountEmail}>{accountLabel}</p>
           </div>
 
@@ -384,36 +384,38 @@ export default function PlatformHubClient() {
               <p>{sessionState?.farmer?.user ? "Linked" : "Not linked"}</p>
             </div>
           </div>
-        </article>
+        </section>
 
-        <article className={styles.gameCard}>
-          <p className={styles.cardKicker}>Game Launch</p>
-          <h2>Virtual Fisher</h2>
-          <p>Skill-based fishing loop with cloud saves and live leaderboard competition.</p>
-          <div className={styles.cardActions}>
-            <Link href="/fish" className={styles.btnPrimary}>
-              Launch Game
-            </Link>
-            <Link href="/leaderboard" className={styles.btnGhost}>
-              Leaderboard
-            </Link>
-          </div>
-        </article>
+        <section className={styles.gameColumns}>
+          <article className={styles.gameSection}>
+            <p className={styles.sectionLabel}>Game Launch</p>
+            <h2>Virtual Fisher</h2>
+            <p>Skill-based fishing loop with cloud saves and live leaderboard competition.</p>
+            <div className={styles.sectionActions}>
+              <Link href="/fish" className={styles.btnPrimary}>
+                Launch Game
+              </Link>
+              <Link href="/leaderboard" className={styles.btnGhost}>
+                Leaderboard
+              </Link>
+            </div>
+          </article>
 
-        <article className={styles.gameCard}>
-          <p className={styles.cardKicker}>Game Launch</p>
-          <h2>Virtual Farmer</h2>
-          <p>Prestige-focused farming progression with cloud sync and leaderboard tracking.</p>
-          <div className={styles.cardActions}>
-            <Link href="/farm" className={styles.btnPrimary}>
-              Launch Game
-            </Link>
-            <Link href="/leaderboard" className={styles.btnGhost}>
-              Leaderboard
-            </Link>
-          </div>
-        </article>
-      </section>
+          <article className={styles.gameSection}>
+            <p className={styles.sectionLabel}>Game Launch</p>
+            <h2>Virtual Farmer</h2>
+            <p>Prestige-focused farming progression with cloud sync and leaderboard tracking.</p>
+            <div className={styles.sectionActions}>
+              <Link href="/farm" className={styles.btnPrimary}>
+                Launch Game
+              </Link>
+              <Link href="/leaderboard" className={styles.btnGhost}>
+                Leaderboard
+              </Link>
+            </div>
+          </article>
+        </section>
+      </div>
     </div>
   );
 }

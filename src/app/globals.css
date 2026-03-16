@@ -41,11 +41,9 @@ a {
   gap: 1.1rem;
 }
 
-.app-card {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(10, 26, 54, 0.86);
-  padding: 1.1rem;
+.app-section {
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .app-title {

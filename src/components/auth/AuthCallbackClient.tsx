@@ -128,7 +128,7 @@ export default function AuthCallbackClient() {
 
   return (
     <main className="callback-wrap">
-      <section className={`app-card callback-card${success ? " is-success" : ""}`}>
+      <section className={`app-section callback-card${success ? " is-success" : ""}`}>
         <h1 className="app-title">{success ? "Registration complete." : "Verifying secure access..."}</h1>
         <p className="app-subtitle">
           {success
