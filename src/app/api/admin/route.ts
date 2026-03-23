@@ -10,6 +10,12 @@ async function verifyAdmin(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader) return null;
 
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_FUNCTIONS_KEY || "";
+  if (!serviceKey) {
+    console.error("[admin] SUPABASE_SERVICE_ROLE_KEY is not set — admin API cannot function.");
+    return null;
+  }
+
   const anonClient = createServerSupabaseClient();
   const { data: { user } } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
   if (!user) return null;
