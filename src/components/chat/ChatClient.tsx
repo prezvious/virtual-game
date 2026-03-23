@@ -58,7 +58,10 @@ export default function ChatClient() {
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${GLOBAL_ROOM}` },
           (payload) => {
             const newMsg = payload.new as Message;
-            setMessages((prev) => [...prev, newMsg]);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
             setTimeout(scrollToBottom, 100);
           }
         )
@@ -86,7 +89,19 @@ export default function ChatClient() {
         body: JSON.stringify({ room_id: GLOBAL_ROOM, content: text }),
       });
       const json = await res.json();
-      if (!json.ok) setInput(text);
+      if (json.ok && json.message) {
+        const optimistic: Message = {
+          ...json.message,
+          user_profiles: { username: currentUsername, avatar_url: "" },
+        };
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === optimistic.id)) return prev;
+          return [...prev, optimistic];
+        });
+        setTimeout(scrollToBottom, 100);
+      } else {
+        setInput(text);
+      }
     } finally {
       setSending(false);
     }
