@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 function forbidden() {
@@ -10,10 +10,11 @@ async function verifyAdmin(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader) return null;
 
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  const anonClient = createServerSupabaseClient();
+  const { data: { user } } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
   if (!user) return null;
 
+  const supabase = createServiceSupabaseClient();
   const { data: profile } = await supabase
     .from("user_profiles")
     .select("is_admin")
