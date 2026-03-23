@@ -1,0 +1,40 @@
+.page {
+  --ink: #172034; --ink-soft: #3f5072; --divider: rgba(29, 40, 70, 0.14);
+  min-height: 100dvh; padding: clamp(1rem, 2.3vw, 1.8rem);
+  background: radial-gradient(circle at 6% 8%, rgba(252, 198, 116, 0.32), rgba(252, 198, 116, 0) 34%),
+    radial-gradient(circle at 94% 2%, rgba(95, 177, 209, 0.34), rgba(95, 177, 209, 0) 38%),
+    linear-gradient(130deg, #fef9f0, #edf6fb 60%, #f6efe2);
+  color: var(--ink);
+}
+.shell { width: min(880px, 100%); margin: 0 auto; }
+.header { padding-bottom: 1rem; border-bottom: 1px solid var(--divider); }
+.title { margin: 0; font-family: var(--font-display), Georgia, serif; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.02em; }
+.subtitle { margin: 0.3rem 0 0; color: var(--ink-soft); }
+
+.progressBar { height: 8px; border-radius: 4px; background: rgba(0,0,0,0.06); margin: 0.8rem 0; overflow: hidden; }
+.progressFill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #22c55e, #3b82f6); transition: width 500ms ease; }
+
+.filters { display: flex; gap: 0.35rem; padding: 0.5rem 0 0.8rem; flex-wrap: wrap; }
+.filterBtn { border-radius: 6px; border: 1px solid rgba(28,41,73,0.15); background: transparent; color: #213453; padding: 0.35rem 0.6rem; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: background 160ms; }
+.filterBtn:hover { background: rgba(0,0,0,0.03); }
+.filterActive { background: linear-gradient(115deg, #fac381, #efad67); border-color: #d89653; }
+.filterActive:hover { background: linear-gradient(115deg, #fac381, #efad67); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.6rem; }
+.emptyMsg { color: var(--ink-soft); text-align: center; padding: 2rem 0; grid-column: 1 / -1; }
+
+.card { border-radius: 10px; border: 1px solid; padding: 0.8rem; display: grid; gap: 0.4rem; transition: transform 160ms; }
+.card:hover { transform: translateY(-1px); }
+.cardUnlocked { }
+.cardLocked { opacity: 0.5; }
+.cardHeader { display: flex; gap: 0.5rem; align-items: flex-start; }
+.cardIcon { font-size: 1.4rem; line-height: 1; }
+.cardName { margin: 0; font-size: 0.92rem; font-weight: 800; }
+.cardRarity { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; }
+.cardDesc { margin: 0; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.4; }
+.cardFooter { display: flex; justify-content: space-between; align-items: center; }
+.cardXp { font-size: 0.78rem; font-weight: 700; color: #22c55e; }
+.cardDate { font-size: 0.72rem; color: var(--ink-soft); font-family: var(--font-mono), monospace; }
+
+.navSection { display: flex; gap: 0.5rem; padding: 1rem 0; flex-wrap: wrap; }
+.btnGhost { border-radius: 8px; border: 1px solid rgba(30,46,82,0.18); background: transparent; color: #223757; padding: 0.55rem 0.85rem; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; }

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__context-mode__ctx_batch_execute",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where node:*)",
+      "Bash(where npm:*)",
+      "Bash(tasklist)",
+      "Bash(taskkill //F //PID 13804)",
+      "Bash(taskkill //F //PID 4140)",
+      "Bash(rm -f C:/Users/prezv/Documents/Coding/gaming-platform/.git/index.lock)",
+      "Bash(powershell -Command \"Remove-Item ''C:\\\\Users\\\\prezv\\\\Documents\\\\Coding\\\\gaming-platform\\\\.git\\\\index.lock'' -Force -ErrorAction SilentlyContinue; Write-Host ''done''\")"
+    ]
+  }
+}

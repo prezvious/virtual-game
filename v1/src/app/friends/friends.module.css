@@ -1,0 +1,33 @@
+.page {
+  --ink: #172034; --ink-soft: #3f5072; --divider: rgba(29, 40, 70, 0.14);
+  min-height: 100dvh; padding: clamp(1rem, 2.3vw, 1.8rem);
+  background: radial-gradient(circle at 6% 8%, rgba(252, 198, 116, 0.32), rgba(252, 198, 116, 0) 34%),
+    radial-gradient(circle at 94% 2%, rgba(95, 177, 209, 0.34), rgba(95, 177, 209, 0) 38%),
+    linear-gradient(130deg, #fef9f0, #edf6fb 60%, #f6efe2);
+  color: var(--ink);
+}
+.shell { width: min(720px, 100%); margin: 0 auto; }
+.header { padding-bottom: 1rem; border-bottom: 1px solid var(--divider); }
+.title { margin: 0; font-family: var(--font-display), Georgia, serif; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.02em; }
+.subtitle { margin: 0.3rem 0 0; color: var(--ink-soft); }
+
+.tabs { display: flex; gap: 0.4rem; padding: 0.8rem 0; border-bottom: 1px solid var(--divider); flex-wrap: wrap; }
+.tab { border-radius: 8px; border: 1px solid rgba(28,41,73,0.18); background: transparent; color: #213453; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; transition: background 160ms; }
+.tab:hover { background: rgba(0,0,0,0.03); }
+.tabActive { background: linear-gradient(115deg, #fac381, #efad67); border-color: #d89653; }
+.tabActive:hover { background: linear-gradient(115deg, #fac381, #efad67); }
+
+.list { padding: 0.5rem 0; display: grid; gap: 0; }
+.emptyMsg { color: var(--ink-soft); padding: 2rem 0; text-align: center; }
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(29,40,70,0.07); }
+.userLink { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.userAvatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f6c07c, #eba863); display: grid; place-items: center; font-weight: 800; font-size: 0.8rem; color: #1b2c49; flex-shrink: 0; }
+.userName { font-weight: 700; font-size: 0.9rem; }
+.rowActions { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+.restrictType { font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(163,60,47,0.1); color: #a33c2f; font-weight: 700; text-transform: uppercase; }
+
+.btnSmall { border-radius: 6px; border: 1px solid #d2924e; background: linear-gradient(118deg, #f6c07c, #eba863); color: #1b2c49; padding: 0.3rem 0.6rem; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+.btnSmallDanger { border-radius: 6px; border: 1px solid rgba(163,60,47,0.25); background: transparent; color: #a33c2f; padding: 0.3rem 0.6rem; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+.navSection { display: flex; gap: 0.5rem; padding: 1rem 0; flex-wrap: wrap; }
+.btnGhost { border-radius: 8px; border: 1px solid rgba(30,46,82,0.18); background: transparent; color: #223757; padding: 0.55rem 0.85rem; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
