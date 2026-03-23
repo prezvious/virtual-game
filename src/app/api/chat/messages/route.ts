@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const roomId = req.nextUrl.searchParams.get("room_id") || "00000000-0000-0000-0000-000000000001";
   const limit = Math.min(50, Number(req.nextUrl.searchParams.get("limit")) || 50);
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("messages")
     .select("id, content, created_at, sender_id, user_profiles:sender_id(username, avatar_url)")
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  const anonClient = createServerSupabaseClient();
+  const { data: { user } } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Message must be 1-2000 characters." }, { status: 400 });
   }
 
+  const supabase = createServiceSupabaseClient();
   const { data: msg, error } = await supabase
     .from("messages")
     .insert({ room_id: roomId, sender_id: user.id, content })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -7,12 +7,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  const anonClient = createServerSupabaseClient();
+  const { data: { user } } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
+  const supabase = createServiceSupabaseClient();
   const { data: rooms } = await supabase
     .from("chat_rooms")
     .select(`
