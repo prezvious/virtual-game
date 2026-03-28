@@ -1,29 +1,29 @@
 # Gaming Platform (Virtual Harvest)
 
-Last updated: March 15, 2026
+Last updated: March 28, 2026
 
-This repo is the active Next.js platform shell for two browser games:
+This repo is the “platform shell” that ties two browser games together:
 
 - Virtual Fisher (served from `public/legacy`)
 - Virtual Farmer (served from `public/farmer-legacy`)
 
-The main idea is simple: one account center, two game worlds, and shared launch/navigation from the same web app.
+The vibe: sign in once, land on a single home hub, then jump between fishing and farming without hopping sites. On top of that, the platform adds a layer of social + progression stuff around the games (profile, friends, achievements, shop, chat, and a public leaderboard).
 
-## Current System Snapshot
+## What’s In The Platform
 
-- Runtime checked locally: Node `v24.14.0`, npm `11.9.0`
-- Root app stack: Next.js `16.1.6`, React `19.2.3`, TypeScript
-- Root package name: `virtual-fisher-next`
-- Active routes launch legacy builds in iframes:
-  - Fisher iframe source: `/legacy/index.html`
-  - Farmer iframe source: `/farmer-legacy/game.html`
-- Fisher data pack currently loaded from `public/legacy`:
-  - 60 biome files
-  - 30 weather definitions
-  - 15 rods
-  - 14 base baits
+- **Landing page** (`/`) that introduces the platform and links to the hub.
+- **Account home / launcher** (`/home`) where you log in, see link status for both games, and launch either world.
+- **Game shell routes** that embed the legacy runtimes:
+  - `/fish` loads `/legacy/index.html`
+  - `/farm` loads `/farmer-legacy/game.html`
+- **Community features**:
+  - `/leaderboard` for the public leaderboard
+  - `/chat` for the global chat (history is intentionally short; recent messages only)
+  - `/friends`, `/profile`, `/profile/[username]`, `/search`
+  - `/achievements`
+- **Shop** (`/shop`) for spending coins on gear and upgrades.
 
-## Quick Start
+## Quick Start (Local Dev)
 
 ```bash
 npm install
@@ -40,77 +40,54 @@ npm run start
 npm run lint
 ```
 
-## App Routes
+## Using It Offline
 
-| Route | Purpose |
+There are two “offline” levels depending on what you want.
+
+1. **Offline for gameplay (recommended):** run the app locally and just use the legacy games.
+   - Start the dev server (`npm run dev`) or a production server (`npm run build` then `npm run start`).
+   - Visit `/fish` or `/farm`.
+   - The platform pages will still load, but features that rely on server data (sign-in, profiles, leaderboards, chat, shop, admin) may be limited or show “signed out / unavailable” messages if you haven’t configured backend credentials.
+
+2. **Offline as pure static HTML:** serve the legacy builds directly.
+   - Start a simple static server pointed at `public/` (pick one):
+     - `npx serve public -l 3000`
+     - `python -m http.server 3000 --directory public`
+   - Open:
+     - `http://localhost:3000/legacy/index.html`
+     - `http://localhost:3000/farmer-legacy/game.html`
+
+Tip: opening the HTML files via `file://` can break things like workers, audio loading, or fetches in some browsers. A local server is the safest “offline” setup.
+
+## Main Routes
+
+| Route | What it’s for |
 |---|---|
 | `/` | Landing page |
-| `/home` | Unified account center and game launcher |
-| `/fish` | Launches Virtual Fisher legacy game |
-| `/farm` | Launches Virtual Farmer legacy game |
-| `/leaderboard` | Public leaderboard page (money + fish) |
-| `/auth/callback` | Completes auth callback/token exchange |
-| `/play` | Redirects to `/fish` |
-| `/farmer` | Redirects to `/farm` |
-
-## API Routes
-
-| Route | Method | What it does |
-|---|---|---|
-| `/api/leaderboard` | `GET` | Returns leaderboard model for UI polling |
-| `/api/auth/exchange` | `POST` | Exchanges Supabase auth `code` or `token_hash` for a session |
-| `/api/alerts` | `POST` | Rate-limited alert forwarder to Supabase Edge Function `send-alert` |
-
-Rate limits currently in code:
-
-- Auth exchange: 20 requests per 5 minutes per IP
-- Alerts: 10 requests per minute per IP
-- Duplicate alert signature throttle: 3 per minute
-
-## Environment Variables
-
-Use these in `.env.local` for local development:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_FUNCTIONS_KEY` (preferred for `/api/alerts`)
-- `SUPABASE_SERVICE_ROLE_KEY` (fallback for `/api/alerts`)
-- `SUPABASE_SEND_ALERT_URL` (optional override for alert forward URL)
-
-Notes:
-
-- `src/lib/supabase.ts` has baked fallback values, but you should set your own env vars for real deployments.
-- `/api/alerts` returns 500 if no usable key is configured.
-
-## Supabase Migrations (Root App)
-
-If you are provisioning a fresh database for the platform side, run SQL files in `supabase/migrations` in filename order:
-
-1. `20260308_create_game_saves.sql`
-2. `20260309_usernames_and_leaderboards.sql`
-3. `20260309_fix_username_underscore_validation.sql`
-4. `20260309_leaderboard_access_and_manual_refresh.sql`
-5. `20260313_add_fish_catalog_and_leaderboard_bigint_safety.sql`
-6. `20260315_leaderboards_include_zero_scores.sql`
-7. `20260315_virtual_farmer_schema_compatibility.sql`
-8. `20260315_farmer_leaderboard_snapshot_refresh.sql`
-9. `20260315_fisher_leaderboard_refresh_20_minutes.sql`
-
-These migrations define the game save table, username/profile rules, leaderboard snapshots + refresh functions, and fish catalog data.
+| `/home` | Account home + launcher |
+| `/fish` | Launch Virtual Fisher |
+| `/farm` | Launch Virtual Farmer |
+| `/leaderboard` | Public leaderboard |
+| `/chat` | Global chat |
+| `/friends` | Friends/following UI |
+| `/profile` | Your profile |
+| `/profile/[username]` | Public profile page |
+| `/search` | Player + content search |
+| `/shop` | Item shop |
+| `/achievements` | Achievements UI |
+| `/admin` | Admin panel (intended for internal use) |
 
 ## Folder Guide
 
-- `src/app`: Next.js routes and API handlers
-- `src/components`: platform hub, iframe shell, leaderboard UI, auth callback client
-- `src/lib`: Supabase helpers, leaderboard fetch model, in-memory rate limit helper
+- `src/app`: Next.js routes (pages + API routes)
+- `src/components`: UI and client components (hub, game shell, chat, onboarding, etc.)
+- `src/lib`: shared helpers/models
 - `public/legacy`: Virtual Fisher static runtime
-- `public/farmer-legacy`: Virtual Farmer static runtime used by `/farm`
-- `virtual-farmer`: standalone/development copy of Virtual Farmer sources
-- `virtual-fisher/nextjs-scaffold`: archived plain scaffold reference
-- `supabase/functions/send-alert`: edge function used by `/api/alerts`
+- `public/farmer-legacy`: Virtual Farmer static runtime
+- `virtual-farmer`: standalone/dev copy of the farmer runtime sources
+- `virtual-fisher`: standalone/dev copy of the fisher runtime sources
 
-## Important Notes
+## Notes
 
-- Legacy/static directories are intentionally ignored by root ESLint config.
-- `virtual-farmer` and `public/farmer-legacy` are similar but not identical deployment targets.
-- There is no automated test suite in the root app yet.
+- This is intentionally a hybrid: modern platform UI plus legacy game runtimes embedded in a shell.
+- There isn’t a full automated test suite at the root yet, so changes are typically validated by running the app locally and clicking through the main flows.

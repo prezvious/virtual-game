@@ -12,6 +12,7 @@
 .subtitle { margin: 0.3rem 0 0; color: var(--ink-soft); }
 
 .chatBox { margin-top: 0.5rem; border: 1px solid var(--divider); border-radius: 12px; background: rgba(255,255,255,0.5); overflow: hidden; }
+.errorBanner { margin: 0; padding: 0.75rem 0.9rem; border-bottom: 1px solid rgba(150, 73, 51, 0.18); background: rgba(193, 92, 64, 0.08); color: #7b3222; font-size: 0.85rem; }
 .messages { height: 420px; overflow-y: auto; padding: 0.8rem; display: grid; gap: 0.15rem; align-content: start; }
 .emptyMsg { color: var(--ink-soft); text-align: center; padding: 3rem 0; }
 
@@ -24,11 +25,13 @@
 .msgTime { font-size: 0.7rem; color: var(--ink-soft); font-family: var(--font-mono), monospace; }
 .msgContent { margin: 0.1rem 0 0; font-size: 0.9rem; line-height: 1.45; word-break: break-word; }
 
-.inputBar { display: flex; gap: 0.4rem; padding: 0.5rem 0.6rem; border-top: 1px solid var(--divider); background: rgba(255,255,255,0.3); }
+.composer { display: grid; gap: 0.45rem; padding: 0.5rem 0.6rem; border-top: 1px solid var(--divider); background: rgba(255,255,255,0.3); }
+.inputBar { display: flex; gap: 0.4rem; }
 .chatInput { flex: 1; border-radius: 8px; border: 1px solid rgba(25,40,73,0.18); background: rgba(255,255,255,0.7); padding: 0.5rem 0.7rem; font-size: 0.9rem; color: var(--ink); resize: none; }
 .chatInput:focus { outline: 2px solid #3f689a; outline-offset: 1px; }
 .sendBtn { border-radius: 8px; border: 1px solid #d2924e; background: linear-gradient(118deg, #f6c07c, #eba863); color: #1b2c49; padding: 0.5rem 0.9rem; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.inputError { margin: 0; color: #7b3222; font-size: 0.82rem; }
 
 .signInBar { display: flex; align-items: center; justify-content: center; gap: 0.6rem; padding: 0.8rem; border-top: 1px solid var(--divider); }
 .signInBar p { margin: 0; color: var(--ink-soft); }

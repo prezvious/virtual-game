@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Farm Simulator - harvest plants, master upgrades, and build a legendary farming empire.">
+    <title>Farm Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,600;6..72,700;6..72,800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260314d">
+</head>
+
+<body data-app-ready="false">
+    <div class="app-loading-overlay" id="app-loading-overlay">Syncing with Farm Cloud...</div>
+    <div class="game-shell">
+        <aside class="nav-rail" aria-label="Primary navigation">
+            <div class="brand-block">
+                <p class="eyebrow">Farm Simulator</p>
+                <h1>Field Console</h1>
+                <p class="helper-note">High-pressure harvest operations</p>
+            </div>
+
+            <nav class="nav-stack">
+                <button class="nav-btn active" data-page="main">Main</button>
+                <button class="nav-btn" data-page="shop">Shop</button>
+                <button class="nav-btn" data-page="upgrades">Upgrades</button>
+                <button class="nav-btn" data-page="inventory">Inventory</button>
+                <button class="nav-btn" data-page="stats">Stats</button>
+                <button class="nav-btn" data-page="achievements">Achievements</button>
+                <button class="nav-btn" data-page="leaderboard">Leaderboard</button>
+            </nav>
+
+            <div class="rail-footer">
+                <p class="helper-note">Keyboard: [Space] Farm, [S] Sell, [A] Auto Farm</p>
+                <div class="account-panel">
+                    <p class="helper-note">Signed in as</p>
+                    <strong id="player-display-name">Local Mode</strong>
+                    <div class="account-actions">
+                        <a class="btn btn-secondary btn-small" id="login-btn" href="login.html?next=game.html">Log In</a>
+                        <a class="btn btn-secondary btn-small" id="signup-btn" href="signup.html?next=game.html">Sign Up</a>
+                        <button class="btn btn-tertiary btn-small" id="signout-btn" hidden>Log Out</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <header class="status-board">
+                <article class="status-card">
+                    <p>Balance</p>
+                    <strong id="balance-display">$0</strong>
+                </article>
+                <article class="status-card">
+                    <p>XP</p>
+                    <strong id="xp-display">0</strong>
+                </article>
+                <article class="status-card">
+                    <p>Plants</p>
+                    <strong id="plants-display">0</strong>
+                </article>
+                <article class="status-card">
+                    <p>Current Hoe</p>
+                    <strong id="hoe-display">Wooden Hoe</strong>
+                </article>
+                <article class="status-card">
+                    <p>Prestige</p>
+                    <strong id="prestige-display">Lv. 0</strong>
+                </article>
+            </header>
+
+            <div class="notification-container" id="notifications"></div>
+
+            <div class="page active" id="page-main">
+                <section class="panel farm-control">
+                    <div>
+                        <p class="eyebrow">Active field</p>
+                        <h2>Harvest Command</h2>
+                    </div>
+
+                    <div class="control-grid">
+                        <label class="control-field" for="hoe-select">
+                            <span>Hoe</span>
+                            <select id="hoe-select" aria-label="Select hoe"></select>
+                        </label>
+                        <label class="control-field" for="fertilizer-select">
+                            <span>Fertilizer</span>
+                            <select id="fertilizer-select" aria-label="Select fertilizer">
+                                <option value="none">No Fertilizer</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="cta-row">
+                        <button class="btn btn-primary farm-btn-lg" id="farm-btn">
+                            Farm
+                            <div class="cooldown-bar" id="cooldown-bar"></div>
+                        </button>
+                        <button class="btn btn-secondary" id="sell-btn">Sell All Plants</button>
+                    </div>
+
+                    <div class="hint-row">
+                        <span>Shortcut: [Space] farm</span>
+                        <span>Shortcut: [S] sell</span>
+                        <span>Shortcut: [F] cycle fertilizer</span>
+                    </div>
+                </section>
+
+                <section class="panel auto-farm-panel">
+                    <div>
+                        <p class="eyebrow">Automation</p>
+                        <h2>Auto Farm</h2>
+                        <p>Runs 6 harvests/sec in background mode with 30% manual yield rate.</p>
+                    </div>
+                    <div class="cta-row">
+                        <button class="btn btn-primary" id="auto-farm-toggle">Enable Auto Farm</button>
+                        <span class="status-pill" id="auto-farm-status">Inactive</span>
+                    </div>
+                    <div class="auto-farm-preview-grid" id="auto-farm-stats"></div>
+                </section>
+
+                <section class="panel prestige-info" id="prestige-card">
+                    <p class="eyebrow">Reset Loop</p>
+                    <h2>Prestige Ready</h2>
+                    <p id="prestige-description"></p>
+                    <button class="btn btn-alert" id="prestige-btn">Prestige Now</button>
+                </section>
+            </div>
+
+            <div class="page" id="page-shop">
+                <section class="panel shop-shell">
+                    <div class="page-head">
+                        <h2>Shop</h2>
+                        <p>Acquire stronger hoes and stock fertilizer strategically.</p>
+                    </div>
+
+                    <div class="shop-toolbar">
+                        <div class="shop-segmented" role="tablist" aria-label="Shop categories">
+                            <button class="shop-segment active" type="button" data-shop-category="all" aria-pressed="true">All</button>
+                            <button class="shop-segment" type="button" data-shop-category="hoes" aria-pressed="false">Hoes</button>
+                            <button class="shop-segment" type="button" data-shop-category="fertilizers" aria-pressed="false">Fertilizers</button>
+                        </div>
+                        <div class="shop-controls">
+                            <select id="shop-sort-select" aria-label="Sort shop items">
+                                <option value="recommended">Sort: Recommended</option>
+                                <option value="price-asc">Sort: Price (Low to High)</option>
+                                <option value="price-desc">Sort: Price (High to Low)</option>
+                                <option value="power-desc">Sort: Power (High to Low)</option>
+                                <option value="efficiency-desc">Sort: Efficiency (High to Low)</option>
+                                <option value="name">Sort: Name (A to Z)</option>
+                            </select>
+                        </div>
+                        <label class="shop-toggle" for="shop-hide-owned">
+                            <input type="checkbox" id="shop-hide-owned">
+                            <span>Hide owned/stocked</span>
+                        </label>
+                    </div>
+
+                    <div class="shop-insights" id="shop-insights"></div>
+
+                    <details class="shop-section" id="shop-hoe-section" open>
+                        <summary>
+                            <span>Hoe Shop</span>
+                            <span class="shop-section-meta" id="shop-hoe-meta"></span>
+                        </summary>
+                        <div class="grid shop-grid" id="hoe-grid"></div>
+                    </details>
+
+                    <details class="shop-section" id="shop-fertilizer-section" open>
+                        <summary>
+                            <span>Fertilizer Shop</span>
+                            <span class="shop-section-meta" id="shop-fertilizer-meta"></span>
+                        </summary>
+                        <div class="grid shop-grid" id="fertilizer-grid"></div>
+                    </details>
+                </section>
+            </div>
+
+            <div class="page" id="page-upgrades">
+                <section class="panel">
+                    <div class="page-head">
+                        <h2>Upgrades</h2>
+                        <p class="helper-note">Costs scale as Base x 5.15^Level</p>
+                    </div>
+                    <div class="grid" id="upgrade-grid"></div>
+                </section>
+            </div>
+
+            <div class="page" id="page-inventory">
+                <section class="panel">
+                    <div class="page-head">
+                        <h2>Inventory</h2>
+                        <p>Track every harvested species and optimize selling runs.</p>
+                    </div>
+
+                    <div class="inventory-controls">
+                        <select id="sort-select" aria-label="Sort inventory">
+                            <option value="name">Sort by Name</option>
+                            <option value="quantity">Sort by Quantity</option>
+                            <option value="value">Sort by Value</option>
+                            <option value="rarity">Sort by Rarity</option>
+                        </select>
+                        <select id="filter-select" aria-label="Filter inventory by rarity">
+                            <option value="all">All Rarities</option>
+                            <option value="common">Common</option>
+                            <option value="uncommon">Uncommon</option>
+                            <option value="rare">Rare</option>
+                            <option value="epic">Epic</option>
+                            <option value="legendary">Legendary</option>
+                            <option value="mythic">Mythic</option>
+                            <option value="ancient">Ancient</option>
+                            <option value="celestial">Celestial</option>
+                            <option value="eldritch">Eldritch</option>
+                            <option value="eternal">Eternal</option>
+                            <option value="divine">Divine</option>
+                            <option value="cosmic">Cosmic</option>
+                            <option value="primordial">Primordial</option>
+                            <option value="singularity">Singularity</option>
+                            <option value="null">Null</option>
+                        </select>
+                    </div>
+
+                    <div class="inventory-grid" id="inventory-grid"></div>
+                    <p id="inventory-total" class="inventory-total"></p>
+                </section>
+            </div>
+
+            <div class="page" id="page-stats">
+                <section class="panel">
+                    <div class="page-head">
+                        <h2>Statistics</h2>
+                        <p>Review performance and optimize your route to prestige.</p>
+                    </div>
+                    <div class="stats-grid" id="stats-grid"></div>
+                </section>
+            </div>
+
+            <div class="page" id="page-achievements">
+                <section class="panel">
+                    <div class="page-head">
+                        <h2>Achievements</h2>
+                        <p class="helper-note" id="achievement-progress"></p>
+                    </div>
+                    <div class="grid" id="achievement-grid"></div>
+                </section>
+            </div>
+
+            <div class="page" id="page-leaderboard">
+                <section class="panel leaderboard-shell">
+                    <div class="page-head">
+                        <h2>Leaderboard</h2>
+                        <p>Top players by total plants, highest balance, and XP.</p>
+                    </div>
+                    <div class="leaderboard-toolbar">
+                        <button class="btn btn-secondary" id="refresh-leaderboard-btn">Refresh Leaderboard</button>
+                        <p class="helper-note" id="leaderboard-last-updated">Last updated: not loaded yet</p>
+                    </div>
+                    <div class="leaderboard-grid">
+                        <article class="leaderboard-card">
+                            <h3>Most Plants</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Farmer</th>
+                                        <th>Plants</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboard-plants-body">
+                                    <tr>
+                                        <td colspan="3">No data yet</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </article>
+                        <article class="leaderboard-card">
+                            <h3>Highest Balance</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Farmer</th>
+                                        <th>Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboard-balance-body">
+                                    <tr>
+                                        <td colspan="3">No data yet</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </article>
+                        <article class="leaderboard-card">
+                            <h3>Highest XP</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Farmer</th>
+                                        <th>XP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboard-xp-body">
+                                    <tr>
+                                        <td colspan="3">No data yet</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </article>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="prestige-modal" role="dialog" aria-modal="true" aria-labelledby="prestige-modal-title"
+        aria-describedby="prestige-modal-desc" aria-hidden="true">
+        <div class="modal-content panel" tabindex="-1">
+            <h2 id="prestige-modal-title">Confirm Prestige</h2>
+            <p id="prestige-modal-desc" class="modal-copy">
+                Are you sure you want to prestige? You will lose all progress but gain permanent bonuses.
+            </p>
+            <p id="prestige-bonus-preview" class="modal-highlight"></p>
+            <div class="modal-buttons">
+                <button class="btn btn-tertiary" id="prestige-cancel">Cancel</button>
+                <button class="btn btn-alert" id="prestige-confirm">Prestige</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/platform-account-bridge.js"></script>
+    <script src="supabase/config.js?v=20260314a"></script>
+    <script src="supabase/client.js?v=20260315b"></script>
+    <script src="data.js?v=20260314d"></script>
+    <script src="game.js?v=20260314d"></script>
+    <script src="ui.js?v=20260315b"></script>
+</body>
+
+</html>
