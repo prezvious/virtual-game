@@ -1,6 +1,8 @@
 ﻿(function initVirtualFarmerSupabase() {
     const STORAGE_CONFIG_KEY = "virtualFarmerSupabaseConfig";
     const SAVE_DEBOUNCE_MS = 1200;
+    const PLAYTIME_GAME_KEY = "farmer";
+    const PLAYTIME_FLUSH_INTERVAL_MS = 15000;
 
     let client = null;
     let activeUser = null;
@@ -8,6 +10,11 @@
     let queuedSnapshot = null;
     let flushTimer = null;
     let saveInFlight = false;
+    let playtimeStartedAt = 0;
+    let playtimePendingMs = 0;
+    let playtimeFlushInFlight = false;
+    let playtimeIntervalId = null;
+    let playtimeLifecycleBound = false;
 
     function trimTrailingSlash(value) {
         return value.replace(/\/+$/, "");
@@ -95,51 +102,19 @@
     }
 
     function fallbackNameFromUser(user) {
-        if (!user || typeof user !== "object") return "Farmer";
+        if (!user || typeof user !== "object") return "Player";
         if (typeof user.email === "string" && user.email.includes("@")) {
             const prefix = user.email.split("@")[0] || "";
             if (prefix) return prefix;
         }
         if (typeof user.id === "string" && user.id.length >= 8) {
-            return `Farmer-${user.id.slice(0, 8)}`;
+            return `Player-${user.id.slice(0, 8)}`;
         }
-        return "Farmer";
+        return "Player";
     }
 
-    function sanitizeDisplayName(value, fallback = "Farmer") {
-        const collapsed = String(value || "").trim().replace(/\s+/g, " ");
-        const cleaned = collapsed.replace(/[^A-Za-z0-9 ._'-]/g, "").slice(0, 24).trim();
-        const fallbackSafe = String(fallback || "Farmer")
-            .replace(/[^A-Za-z0-9 ._'-]/g, "")
-            .slice(0, 24)
-            .trim();
-
-        const candidate = cleaned || fallbackSafe || "Farmer";
-        if (candidate.length >= 3) return candidate;
-        return `Farmer-${Date.now().toString().slice(-6)}`;
-    }
-
-    async function upsertProfile(displayNameOverride) {
-        if (!activeUser) return null;
-        const supabaseClient = getClientOrThrow();
-        const fallback = fallbackNameFromUser(activeUser);
-        const displayName = sanitizeDisplayName(
-            displayNameOverride || activeUser.user_metadata?.display_name,
-            fallback
-        );
-
-        const row = {
-            user_id: activeUser.id,
-            display_name: displayName
-        };
-
-        const { error } = await supabaseClient
-            .from("profiles")
-            .upsert(row, { onConflict: "user_id" });
-
-        if (error) throw error;
-        cachedProfile = row;
-        return row;
+    function getUsername() {
+        return typeof cachedProfile?.username === "string" ? cachedProfile.username : "";
     }
 
     async function loadProfile() {
@@ -150,8 +125,8 @@
 
         const supabaseClient = getClientOrThrow();
         const { data, error } = await supabaseClient
-            .from("profiles")
-            .select("user_id, display_name")
+            .from("user_profiles")
+            .select("user_id, username")
             .eq("user_id", activeUser.id)
             .maybeSingle();
 
@@ -162,12 +137,111 @@
             return data;
         }
 
-        return upsertProfile();
+        cachedProfile = {
+            user_id: activeUser.id,
+            username: ""
+        };
+        return cachedProfile;
+    }
+
+    function canTrackPlaytime() {
+        if (!activeUser) return false;
+        if (typeof document !== "undefined" && document.visibilityState !== "visible") return false;
+        if (typeof document !== "undefined" && typeof document.hasFocus === "function") {
+            return document.hasFocus();
+        }
+        return true;
+    }
+
+    function syncPlaytimeActivity(forcePause = false) {
+        const now = Date.now();
+        const shouldTrack = !forcePause && canTrackPlaytime();
+
+        if (shouldTrack) {
+            if (!playtimeStartedAt) {
+                playtimeStartedAt = now;
+            }
+            return;
+        }
+
+        if (playtimeStartedAt) {
+            playtimePendingMs += Math.max(0, now - playtimeStartedAt);
+            playtimeStartedAt = 0;
+        }
+    }
+
+    async function flushPlaytime() {
+        if (!activeUser) return null;
+        if (typeof navigator !== "undefined" && navigator.onLine === false) return null;
+
+        syncPlaytimeActivity();
+        const wholeSeconds = Math.floor(playtimePendingMs / 1000);
+        if (wholeSeconds <= 0 || playtimeFlushInFlight) return null;
+
+        playtimeFlushInFlight = true;
+        try {
+            const supabaseClient = getClientOrThrow();
+            const { data, error } = await supabaseClient.rpc("increment_user_game_playtime", {
+                p_game_key: PLAYTIME_GAME_KEY,
+                p_delta_seconds: wholeSeconds
+            });
+            if (error) throw error;
+            playtimePendingMs = Math.max(0, playtimePendingMs - (wholeSeconds * 1000));
+            return data || null;
+        } catch (error) {
+            console.error("Playtime sync failed:", error);
+            return null;
+        } finally {
+            playtimeFlushInFlight = false;
+            syncPlaytimeActivity();
+        }
+    }
+
+    function bindPlaytimeLifecycle() {
+        if (playtimeLifecycleBound) return;
+        playtimeLifecycleBound = true;
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                syncPlaytimeActivity();
+                return;
+            }
+            syncPlaytimeActivity(true);
+            void flushPlaytime();
+        });
+
+        window.addEventListener("focus", () => {
+            syncPlaytimeActivity();
+        });
+
+        window.addEventListener("blur", () => {
+            syncPlaytimeActivity(true);
+            void flushPlaytime();
+        });
+
+        window.addEventListener("pagehide", () => {
+            syncPlaytimeActivity(true);
+            void flushPlaytime();
+        });
+
+        playtimeIntervalId = window.setInterval(() => {
+            if (!activeUser) return;
+            syncPlaytimeActivity();
+            void flushPlaytime();
+        }, PLAYTIME_FLUSH_INTERVAL_MS);
     }
 
     function setActiveUser(user) {
-        activeUser = user || null;
+        const nextUser = user || null;
+        const didUserChange = activeUser?.id !== nextUser?.id;
+        if (didUserChange) {
+            syncPlaytimeActivity(true);
+            playtimePendingMs = 0;
+        }
+
+        activeUser = nextUser;
         if (!activeUser) cachedProfile = null;
+        syncPlaytimeActivity();
     }
 
     async function init({ requireAuth = false, redirectTo } = {}) {
@@ -185,6 +259,8 @@
                 error: new Error("Supabase client library was not loaded.")
             };
         }
+
+        bindPlaytimeLifecycle();
 
         let sessionData;
         try {
@@ -247,13 +323,10 @@
         return message || fallbackMessage;
     }
 
-    async function signUp({ email, password, displayName }) {
-        const fallback = String(email || "").includes("@") ? String(email).split("@")[0] : "Farmer";
-        const safeName = sanitizeDisplayName(displayName, fallback || "Farmer");
-
+    async function signUp({ email, password }) {
         const accountBridge = window.PlatformAccountBridge;
         if (accountBridge && typeof accountBridge.signUp === "function") {
-            const bridgeResult = await accountBridge.signUp({ email, password, displayName: safeName });
+            const bridgeResult = await accountBridge.signUp({ email, password });
             if (!bridgeResult?.ok) {
                 throw new Error(getBridgeErrorMessage(bridgeResult, "Sign-up failed."));
             }
@@ -282,12 +355,7 @@
         const supabaseClient = getClientOrThrow();
         const { data, error } = await supabaseClient.auth.signUp({
             email,
-            password,
-            options: {
-                data: {
-                    display_name: safeName
-                }
-            }
+            password
         });
 
         if (error) throw error;
@@ -296,9 +364,9 @@
 
         if (data.session?.user) {
             try {
-                await upsertProfile(safeName);
+                await loadProfile();
             } catch (profileError) {
-                console.error("Profile upsert failed after sign up:", profileError);
+                console.error("Profile refresh failed after sign up:", profileError);
             }
         }
 
@@ -375,6 +443,7 @@
         } catch (saveError) {
             console.error("Final cloud save failed during sign out:", saveError);
         }
+        await flushPlaytime();
 
         const accountBridge = window.PlatformAccountBridge;
         if (accountBridge && typeof accountBridge.signOut === "function") {
@@ -430,6 +499,7 @@
 
     async function saveProgress(snapshot) {
         if (!activeUser) return null;
+        await flushPlaytime();
 
         const supabaseClient = getClientOrThrow();
         const payload = normalizeSnapshot(snapshot);
@@ -439,14 +509,6 @@
             .upsert(payload, { onConflict: "user_id" });
 
         if (error) throw error;
-
-        if (!cachedProfile) {
-            try {
-                await upsertProfile();
-            } catch (profileError) {
-                console.error("Could not ensure profile while saving progress:", profileError);
-            }
-        }
 
         return payload;
     }
@@ -472,7 +534,7 @@
 
         const { data, error } = await supabaseClient
             .from("leaderboard")
-            .select("user_id, display_name, total_plants, balance, xp, prestige_level, achievements_count, updated_at")
+            .select("user_id, username, total_plants, balance, xp, prestige_level, achievements_count, updated_at")
             .order(safeMetric, { ascending: false })
             .order("updated_at", { ascending: true })
             .limit(maxRows);
@@ -584,14 +646,12 @@
         }
     }
 
-    function getDisplayName() {
-        if (cachedProfile && typeof cachedProfile.display_name === "string") {
-            return cachedProfile.display_name;
+    function getPlayerLabel() {
+        const username = getUsername();
+        if (username) {
+            return `@${username}`;
         }
-        if (activeUser?.user_metadata?.display_name) {
-            return sanitizeDisplayName(activeUser.user_metadata.display_name, fallbackNameFromUser(activeUser));
-        }
-        return fallbackNameFromUser(activeUser);
+        return activeUser?.email || fallbackNameFromUser(activeUser);
     }
 
     function onAuthStateChange(callback) {
@@ -637,7 +697,8 @@
         isConfigured,
         isAuthenticated,
         getCurrentUser,
-        getDisplayName,
+        getUsername,
+        getDisplayName: getPlayerLabel,
         redirectIfAuthenticated,
         signUp,
         signIn,
@@ -646,6 +707,7 @@
         loadProgress,
         queueSave,
         flushQueuedSave,
+        flushPlaytime,
         fetchLeaderboard,
         fetchLeaderboardBundle,
         onAuthStateChange

@@ -154,6 +154,70 @@ function initGame() {
     });
 }
 
+// ==================== WEATHER SYSTEM ====================
+const FARMER_WEATHER = {
+    clear:  { name: 'Clear',   icon: '\u2600\uFE0F', yieldMult: 1.0,  xpMult: 1.0,  desc: 'Standard farming conditions.' },
+    rain:   { name: 'Rain',    icon: '\uD83C\uDF27\uFE0F', yieldMult: 1.15, xpMult: 1.05, desc: '+15% yield from well-watered soil.' },
+    storm:  { name: 'Storm',   icon: '\u26C8\uFE0F', yieldMult: 1.3,  xpMult: 1.2,  desc: '+30% yield, +20% XP. Lightning energizes crops.' },
+    fog:    { name: 'Fog',     icon: '\uD83C\uDF2B\uFE0F', yieldMult: 0.9,  xpMult: 1.1,  desc: '-10% yield but +10% XP. Mysterious growing conditions.' },
+    snow:   { name: 'Snow',    icon: '\u2744\uFE0F', yieldMult: 0.8,  xpMult: 1.0,  desc: '-20% yield. Frost slows growth.' },
+    wind:   { name: 'Wind',    icon: '\uD83C\uDF2C\uFE0F', yieldMult: 1.1,  xpMult: 1.0,  desc: '+10% yield. Wind spreads seeds further.' },
+};
+
+let currentWeather = { condition: 'clear', intensity: 1 };
+let weatherLastUpdated = null;
+let weatherPollTimer = null;
+
+function getWeatherEffects() {
+    const w = FARMER_WEATHER[currentWeather.condition] || FARMER_WEATHER.clear;
+    const intensity = Math.max(1, Math.min(5, currentWeather.intensity || 1));
+    // Intensity scales the effect: intensity 1 = base, intensity 5 = 1.5x the bonus/penalty
+    const scale = 1 + (intensity - 1) * 0.125;
+    return {
+        yieldMult: 1 + (w.yieldMult - 1) * scale,
+        xpMult: 1 + (w.xpMult - 1) * scale,
+        name: w.name,
+        icon: w.icon,
+        desc: w.desc,
+    };
+}
+
+function updateWeatherDisplay() {
+    const el = document.getElementById('weather-display');
+    if (!el) return;
+    const w = FARMER_WEATHER[currentWeather.condition] || FARMER_WEATHER.clear;
+    el.textContent = `${w.icon} ${w.name}`;
+    const card = document.getElementById('weather-card');
+    if (card) card.title = w.desc;
+}
+
+async function fetchFarmerWeather() {
+    try {
+        const res = await fetch('/api/weather?game=farmer');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.ok || !json.weather) return;
+
+        if (json.updated_at && json.updated_at === weatherLastUpdated) return;
+        weatherLastUpdated = json.updated_at;
+
+        const condition = String(json.weather.condition || 'clear').toLowerCase();
+        const intensity = Number(json.weather.intensity) || 1;
+
+        if (currentWeather.condition !== condition || currentWeather.intensity !== intensity) {
+            currentWeather = { condition, intensity };
+            updateWeatherDisplay();
+        }
+    } catch (e) {
+        // Silently ignore (offline, etc.)
+    }
+}
+
+function startWeatherPolling() {
+    fetchFarmerWeather();
+    weatherPollTimer = setInterval(fetchFarmerWeather, 3 * 60 * 1000);
+}
+
 // ==================== NUMBER FORMATTING ====================
 function formatNumber(num) {
     if (num < 1000) return Math.floor(num).toLocaleString();
@@ -194,6 +258,9 @@ function queueCloudProgressSave(immediate = false) {
     const supabaseApi = window.VirtualFarmerSupabase;
     if (!supabaseApi || !supabaseApi.isAuthenticated()) return;
     supabaseApi.queueSave(getProgressSnapshotForCloud(), { immediate });
+    if (typeof supabaseApi.flushPlaytime === "function") {
+        void supabaseApi.flushPlaytime();
+    }
 }
 
 function applyCloudProgressRow(progressRow) {
@@ -356,6 +423,9 @@ function calculateYield({ suppressNotifications = false } = {}) {
     const singularityMult = Math.pow(1.1, game.upgrades.singularityEngine || 0);
     baseYield *= singularityMult;
 
+    // Weather effect on yield
+    baseYield *= getWeatherEffects().yieldMult;
+
     return Math.floor(baseYield);
 }
 
@@ -363,6 +433,8 @@ function calculateXP() {
     let baseXP = 10 + game.selectedHoeIndex * 5 + Math.floor(Math.random() * 5);
     baseXP *= (1 + (game.upgrades.experienced || 0) * 0.2);
     baseXP *= (1 + game.prestigeBonus / 100);
+    // Weather effect on XP
+    baseXP *= getWeatherEffects().xpMult;
     return Math.floor(baseXP);
 }
 

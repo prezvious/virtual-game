@@ -20,20 +20,14 @@ const STEPS = [
   {
     id: "profile",
     title: "Set Up Your Profile",
-    body: "Add a bio, customize your avatar, and show off your achievements. Visit your profile page anytime.",
-    tip: "Other players can find you through search and follow your progress.",
+    body: "Set your shared username, add a profile note, and review your cross-game playtime from one account page.",
+    tip: "Your username is the single public handle for both Virtual Fisher and Virtual Farmer.",
   },
   {
     id: "social",
     title: "Connect With Others",
-    body: "Follow friends, climb leaderboards, and chat with the community in real-time.",
-    tip: "Mutual follows become friends — unlock social achievements!",
-  },
-  {
-    id: "shop",
-    title: "Gear Up in the Shop",
-    body: "Spend your earned coins on rods, bait, amulets, boosts, and cosmetics.",
-    tip: "Rarer items give bigger bonuses. Save up for legendary gear!",
+    body: "Follow friends, climb leaderboards, and keep one public profile across the platform.",
+    tip: "Mutual follows become friends - unlock social achievements.",
   },
 ];
 
@@ -51,7 +45,11 @@ export default function OnboardingFlow() {
         const supabase = getClientSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
-        const { data } = await supabase.from("onboarding_progress").select("completed_at, skipped").eq("user_id", session.user.id).maybeSingle();
+        const { data } = await supabase
+          .from("onboarding_progress")
+          .select("completed_at, skipped")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
         if (data?.completed_at || data?.skipped) {
           localStorage.setItem(DISMISSED_KEY, "true");
           return;
@@ -94,12 +92,15 @@ export default function OnboardingFlow() {
     <div className={`${styles.overlay} ${closing ? styles.overlayClosing : ""}`}>
       <div className={styles.card}>
         <button className={styles.skipBtn} onClick={() => void close(true)} aria-label="Skip tutorial">
-          ✕
+          x
         </button>
 
         <div className={styles.stepIndicator}>
-          {STEPS.map((_, i) => (
-            <span key={i} className={`${styles.dot} ${i === step ? styles.dotActive : ""} ${i < step ? styles.dotDone : ""}`} />
+          {STEPS.map((_, index) => (
+            <span
+              key={index}
+              className={`${styles.dot} ${index === step ? styles.dotActive : ""} ${index < step ? styles.dotDone : ""}`}
+            />
           ))}
         </div>
 

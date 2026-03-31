@@ -49,7 +49,6 @@
                     <button class="btn-secondary hero-account-btn hero-account-icon-btn" id="btn-login" onclick="AuthAPI.login()" aria-label="Account Info" title="Account Info">
                         <img class="hero-account-icon" src="icon/profile.svg" alt="">
                     </button>
-                    <button class="btn-danger hero-account-btn" id="btn-logout" onclick="AuthAPI.logout()">Logout</button>
                     <button class="btn-primary hero-account-btn hero-account-guest-btn" id="btn-login-text" onclick="AuthAPI.login()">Starts here</button>
                 </div>
             </div>
@@ -379,13 +378,6 @@
                 <input id="auth-email" class="auth-field-input" type="email" autocomplete="email"
                     placeholder="you@example.com" required />
 
-                <div class="auth-signup-only" id="auth-username-block" hidden>
-                    <label class="auth-field-label" for="auth-username">Username</label>
-                    <input id="auth-username" class="auth-field-input" type="text" autocomplete="username"
-                        placeholder="3-20 chars, start with letter, letters/numbers/_" minlength="3" maxlength="20" />
-                    <p class="auth-username-feedback" id="auth-username-feedback"></p>
-                </div>
-
                 <label class="auth-field-label" for="auth-password">Password</label>
                 <div class="auth-password-input-wrap">
                     <input id="auth-password" class="auth-field-input" type="password" autocomplete="current-password"
@@ -437,27 +429,8 @@
             <div class="account-readonly-grid">
                 <label class="auth-field-label" for="account-username">Username</label>
                 <input id="account-username" class="auth-field-input" type="text" disabled />
-                <button type="button" class="btn-primary auth-submit-btn" id="account-edit-username" onclick="AuthAPI.openUsernameEditor()">Edit Username</button>
             </div>
-        </div>
-    </div>
-    <div class="shop-modal-overlay" id="username-overlay" onclick="AuthAPI.closeUsernameModal()"></div>
-    <div class="shop-modal auth-modal username-modal" id="username-modal">
-        <div class="shop-modal-header">
-            <h2 id="username-modal-title">Set Username</h2>
-            <button class="shop-close-btn" onclick="AuthAPI.closeUsernameModal()">&times;</button>
-        </div>
-        <div class="shop-tab-content auth-modal-content">
-            <p class="panel-note" id="username-modal-subtitle">Choose a unique username to appear on global leaderboards.</p>
-            <form id="username-form" class="auth-form" onsubmit="return AuthAPI.submitUsername(event)">
-                <label class="auth-field-label" for="username-required-input">Username</label>
-                <input id="username-required-input" class="auth-field-input" type="text" autocomplete="username"
-                    placeholder="3-20 chars, start with letter, letters/numbers/_" minlength="3" maxlength="20" required />
-                <p class="auth-username-feedback" id="username-required-availability"></p>
-                <button type="submit" class="btn-primary auth-submit-btn" id="username-submit-btn">Save Username</button>
-                <button type="button" class="btn-secondary auth-submit-btn" id="username-skip-btn" onclick="AuthAPI.skipUsernameSetup()">Skip Leaderboards For Now</button>
-            </form>
-            <p class="auth-form-feedback" id="username-form-feedback"></p>
+            <p class="panel-note">Manage your global username on <a href="/profile">/profile</a>.</p>
         </div>
     </div>
 

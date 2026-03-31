@@ -22,6 +22,7 @@
         fisher: null,
         farmer: null
     };
+    let sharedSessionStatePromise = null;
 
     function usesSharedAuthBackend() {
         return FISHER_CONFIG.url === FARMER_CONFIG.url
@@ -48,29 +49,6 @@
         return password;
     }
 
-    function buildDisplayName(value, email) {
-        const candidate = sanitizeText(value)
-            .replace(/\s+/g, ' ')
-            .replace(/[^A-Za-z0-9 ._'-]/g, '')
-            .slice(0, 24)
-            .trim();
-
-        if (candidate.length >= 3) {
-            return candidate;
-        }
-
-        const prefix = sanitizeText(email.split('@')[0])
-            .replace(/[^A-Za-z0-9 ._'-]/g, '')
-            .slice(0, 24)
-            .trim();
-
-        if (prefix.length >= 3) {
-            return prefix;
-        }
-
-        return 'Player';
-    }
-
     function getSupabaseFactory() {
         if (!window.supabase || typeof window.supabase.createClient !== 'function') {
             throw new Error('Supabase client library is not available.');
@@ -84,6 +62,16 @@
 
     function getClient(name) {
         const key = name === 'farmer' ? 'farmer' : 'fisher';
+
+        // When both games share the same Supabase project, reuse a single
+        // client instance to prevent navigator.locks contention.
+        if (key === 'farmer' && usesSharedAuthBackend()) {
+            if (!clients.fisher) {
+                getClient('fisher');
+            }
+            return clients.fisher;
+        }
+
         if (clients[key]) {
             return clients[key];
         }
@@ -158,6 +146,48 @@
     }
 
     async function getSessionState() {
+        if (usesSharedAuthBackend()) {
+            if (!sharedSessionStatePromise) {
+                sharedSessionStatePromise = readProjectSession('fisher')
+                    .then((sharedState) => {
+                        const sharedUser = sharedState.user || null;
+                        const sharedSession = sharedState.session || null;
+                        const sharedOk = sharedUser ? true : sharedState.ok;
+                        const sharedError = sharedUser ? '' : sharedState.error;
+
+                        const fisher = {
+                            ...sharedState,
+                            project: 'fisher',
+                            label: FISHER_CONFIG.label,
+                            ok: sharedOk,
+                            user: sharedUser,
+                            session: sharedSession,
+                            error: sharedError
+                        };
+
+                        const farmer = {
+                            ...fisher,
+                            project: 'farmer',
+                            label: FARMER_CONFIG.label
+                        };
+
+                        const primaryUser = sharedUser;
+                        return {
+                            fisher,
+                            farmer,
+                            primaryUser,
+                            isSignedIn: Boolean(primaryUser),
+                            isFullyLinked: Boolean(primaryUser)
+                        };
+                    })
+                    .finally(() => {
+                        sharedSessionStatePromise = null;
+                    });
+            }
+
+            return sharedSessionStatePromise;
+        }
+
         let [fisher, farmer] = await Promise.all([
             readProjectSession('fisher'),
             readProjectSession('farmer')
@@ -242,25 +272,17 @@
     function getAuthPayload(input) {
         const email = ensureEmail(input && input.email);
         const password = ensurePassword(input && input.password);
-        const displayName = buildDisplayName(input && input.displayName, email);
-        return { email, password, displayName };
+        return { email, password };
     }
 
-    function fisherSignUpOptions(displayName) {
+    function fisherSignUpOptions() {
         return {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: {
-                display_name: displayName
-            }
+            emailRedirectTo: `${window.location.origin}/auth/callback`
         };
     }
 
-    function farmerSignUpOptions(displayName) {
-        return {
-            data: {
-                display_name: displayName
-            }
-        };
+    function farmerSignUpOptions() {
+        return {};
     }
 
     async function attemptSignIn(name, payload) {
@@ -292,8 +314,8 @@
     async function attemptProvision(name, payload) {
         const client = getClient(name);
         const options = name === 'fisher'
-            ? fisherSignUpOptions(payload.displayName)
-            : farmerSignUpOptions(payload.displayName);
+            ? fisherSignUpOptions()
+            : farmerSignUpOptions();
 
         try {
             const { data, error } = await client.auth.signUp({
@@ -432,7 +454,7 @@
             fisherResult = await fisherClient.auth.signUp({
                 email: payload.email,
                 password: payload.password,
-                options: fisherSignUpOptions(payload.displayName)
+                options: fisherSignUpOptions()
             });
             farmerResult = {
                 data: fisherResult.data,
@@ -446,12 +468,12 @@
                 fisherClient.auth.signUp({
                     email: payload.email,
                     password: payload.password,
-                    options: fisherSignUpOptions(payload.displayName)
+                    options: fisherSignUpOptions()
                 }),
                 farmerClient.auth.signUp({
                     email: payload.email,
                     password: payload.password,
-                    options: farmerSignUpOptions(payload.displayName)
+                    options: farmerSignUpOptions()
                 })
             ]);
         }
@@ -531,10 +553,11 @@
     }
 
     window.PlatformAccountBridge = {
-        version: '2026-03-15a',
+        version: '2026-04-01a',
         getSessionState,
         signIn,
         signUp,
-        signOut
+        signOut,
+        getClient
     };
 })();

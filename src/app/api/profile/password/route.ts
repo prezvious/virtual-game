@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const anonClient = createServerSupabaseClient();
+  const supabase = createServiceSupabaseClient();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  const { data: { user }, error: authError } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
   if (authError || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }

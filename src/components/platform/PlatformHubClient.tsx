@@ -37,8 +37,8 @@ type BridgeAuthResult = {
 
 type PlatformAccountBridge = {
   getSessionState: () => Promise<BridgeSessionState>;
-  signIn: (payload: { email: string; password: string; displayName?: string }) => Promise<BridgeAuthResult>;
-  signUp: (payload: { email: string; password: string; displayName?: string }) => Promise<BridgeAuthResult>;
+  signIn: (payload: { email: string; password: string }) => Promise<BridgeAuthResult>;
+  signUp: (payload: { email: string; password: string }) => Promise<BridgeAuthResult>;
   signOut: () => Promise<BridgeSessionState>;
 };
 
@@ -160,7 +160,6 @@ export default function PlatformHubClient() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [statusMessage, setStatusMessage] = useState("Loading unified account status...");
   const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
 
@@ -218,7 +217,6 @@ export default function PlatformHubClient() {
         const payload = {
           email,
           password,
-          displayName: displayName || undefined,
         };
 
         const result = mode === "signup" ? await bridge.signUp(payload) : await bridge.signIn(payload);
@@ -251,7 +249,7 @@ export default function PlatformHubClient() {
         setIsBusy(false);
       }
     },
-    [bridge, displayName, email, mode, password],
+    [bridge, email, mode, password],
   );
 
   const onSignOut = useCallback(async () => {
@@ -281,7 +279,7 @@ export default function PlatformHubClient() {
           <h1>Unified Game Console</h1>
           <p>
             One account operation now authenticates both Virtual Fisher and Virtual Farmer while keeping
-            each game&apos;s save model untouched.
+            each game&apos;s save model untouched. Global username setup now lives on your profile page.
           </p>
         </div>
         <div className={styles.heroActions}>
@@ -332,20 +330,6 @@ export default function PlatformHubClient() {
                 disabled={isBusy}
               />
             </label>
-
-            {mode === "signup" ? (
-              <label>
-                <span>Display Name</span>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  maxLength={24}
-                  autoComplete="nickname"
-                  disabled={isBusy}
-                />
-              </label>
-            ) : null}
 
             <label>
               <span>Password</span>
@@ -424,9 +408,6 @@ export default function PlatformHubClient() {
             <Link href="/profile" className={styles.btnGhost}>My Profile</Link>
             <Link href="/friends" className={styles.btnGhost}>Friends</Link>
             <Link href="/achievements" className={styles.btnGhost}>Achievements</Link>
-            <Link href="/shop" className={styles.btnGhost}>Shop</Link>
-            <Link href="/chat" className={styles.btnGhost}>Chat</Link>
-            <Link href="/search" className={styles.btnGhost}>Search</Link>
           </div>
         </section>
       </div>

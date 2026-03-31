@@ -7,9 +7,20 @@ const SUPABASE_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
 const ALERT_FUNCTION_URL = '/api/alerts';
 
-const cloudSupabaseClient = (window.supabase && typeof window.supabase.createClient === 'function')
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-    : null;
+const cloudSupabaseClient = (() => {
+    // Reuse the bridge's fisher client when available to prevent lock contention
+    // from multiple Supabase instances sharing the same storage key.
+    const bridge = window.PlatformAccountBridge;
+    if (bridge && typeof bridge.getClient === 'function') {
+        try { return bridge.getClient('fisher'); } catch (e) {
+            console.warn('Could not reuse bridge client:', e.message);
+        }
+    }
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+        return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+    return null;
+})();
 
 if (!cloudSupabaseClient) {
     console.error('Supabase client library is missing. Check script order in index.html.');
@@ -54,6 +65,13 @@ const CloudSystem = {
     recentAlertSignatures: {},
     passwordUiBound: false,
     passwordRulesMinLength: 8,
+    playtimeGameKey: 'fisher',
+    playtimeStartedAt: 0,
+    playtimePendingMs: 0,
+    playtimeFlushInFlight: false,
+    playtimeLifecycleHandlersBound: false,
+    playtimeIntervalId: null,
+    playtimeFlushIntervalMs: 15000,
 
     init: async function (gameInstance) {
         this.game = gameInstance;
@@ -65,9 +83,14 @@ const CloudSystem = {
         if (!this.lifecycleBound) {
             this.lifecycleBound = true;
             window.addEventListener('pagehide', () => {
+                this._syncPlaytimeActivity(true);
+                this.flushPlaytime().catch((err) => {
+                    console.warn('Playtime flush on pagehide failed:', err?.message || err);
+                });
                 this.cleanupSingleSessionEnforcement({ resetSessionState: false });
             });
         }
+        this._bindPlaytimeLifecycle();
         this._bindNetworkLifecycle();
         this._bindGlobalErrorHandlers();
 
@@ -81,6 +104,8 @@ const CloudSystem = {
             const hasSessionUser = !!(session && session.user);
 
             if (event === 'SIGNED_OUT') {
+                this._syncPlaytimeActivity(true);
+                this.playtimePendingMs = 0;
                 this.cleanupSingleSessionEnforcement();
                 this.user = null;
                 this.loadedCloudUserId = null;
@@ -96,7 +121,7 @@ const CloudSystem = {
             if (hasSessionUser) {
                 const nextUser = session.user;
                 const previousUserId = this.user ? this.user.id : null;
-                this.handleLoginSuccess(nextUser);
+                await this.handleLoginSuccess(nextUser);
                 this.authHydrated = true;
 
                 if (event === 'SIGNED_IN') {
@@ -240,11 +265,19 @@ const CloudSystem = {
     },
 
     _announceAlertDispatch: function (message, tone = 'warning') {
-        if (this.game && typeof this.game.log === 'function') {
-            this.game.log(message);
+        try {
+            if (this.game && typeof this.game.log === 'function') {
+                this.game.log(message);
+            }
+        } catch (err) {
+            console.warn('Cloud alert dispatch log failed:', err?.message || err);
         }
-        if (this.game && this.game.ui && typeof this.game.ui.updateStatus === 'function') {
-            this.game.ui.updateStatus(message, tone);
+        try {
+            if (this.game && this.game.ui && typeof this.game.ui.updateStatus === 'function') {
+                this.game.ui.updateStatus(message, tone);
+            }
+        } catch (err) {
+            console.warn('Cloud alert dispatch status update failed:', err?.message || err);
         }
     },
 
@@ -484,9 +517,95 @@ const CloudSystem = {
             : 'Cloud: Offline';
     },
 
+    _canTrackPlaytime: function () {
+        if (!this.user || !this.sessionActive) return false;
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return false;
+        if (typeof document !== 'undefined' && typeof document.hasFocus === 'function') {
+            return document.hasFocus();
+        }
+        return true;
+    },
+
+    _syncPlaytimeActivity: function (forcePause = false) {
+        const now = Date.now();
+        const shouldTrack = !forcePause && this._canTrackPlaytime();
+
+        if (shouldTrack) {
+            if (!this.playtimeStartedAt) {
+                this.playtimeStartedAt = now;
+            }
+            return;
+        }
+
+        if (this.playtimeStartedAt) {
+            this.playtimePendingMs += Math.max(0, now - this.playtimeStartedAt);
+            this.playtimeStartedAt = 0;
+        }
+    },
+
+    _bindPlaytimeLifecycle: function () {
+        if (this.playtimeLifecycleHandlersBound) return;
+        this.playtimeLifecycleHandlersBound = true;
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this._syncPlaytimeActivity();
+                return;
+            }
+
+            this._syncPlaytimeActivity(true);
+            this.flushPlaytime().catch((err) => {
+                console.warn('Playtime flush on visibility change failed:', err?.message || err);
+            });
+        });
+
+        window.addEventListener('focus', () => {
+            this._syncPlaytimeActivity();
+        });
+
+        window.addEventListener('blur', () => {
+            this._syncPlaytimeActivity(true);
+            this.flushPlaytime().catch((err) => {
+                console.warn('Playtime flush on blur failed:', err?.message || err);
+            });
+        });
+
+        this.playtimeIntervalId = window.setInterval(() => {
+            if (!this.user) return;
+            this._syncPlaytimeActivity();
+            this.flushPlaytime().catch((err) => {
+                console.warn('Scheduled playtime flush failed:', err?.message || err);
+            });
+        }, this.playtimeFlushIntervalMs);
+    },
+
+    flushPlaytime: async function () {
+        if (!cloudSupabaseClient || !this.user || !this.sessionActive) return null;
+        if (!this._isOnline()) return null;
+
+        this._syncPlaytimeActivity();
+        const wholeSeconds = Math.floor(this.playtimePendingMs / 1000);
+        if (wholeSeconds <= 0 || this.playtimeFlushInFlight) return null;
+
+        this.playtimeFlushInFlight = true;
+
+        try {
+            const { data, error } = await cloudSupabaseClient.rpc('increment_user_game_playtime', {
+                p_game_key: this.playtimeGameKey,
+                p_delta_seconds: wholeSeconds
+            });
+
+            if (error) throw error;
+            this.playtimePendingMs = Math.max(0, this.playtimePendingMs - (wholeSeconds * 1000));
+            return data || null;
+        } finally {
+            this.playtimeFlushInFlight = false;
+            this._syncPlaytimeActivity();
+        }
+    },
+
     refreshAccountModal: function () {
         const usernameInput = document.getElementById('account-username');
-        const editUsernameBtn = document.getElementById('account-edit-username');
         const accountStatus = document.getElementById('account-cloud-status');
         const hasUser = !!this.user;
         const profileUsername = this.profile?.username_normalized || this.profile?.username || '';
@@ -499,18 +618,11 @@ const CloudSystem = {
             if (hasUser && profileUsername) {
                 usernameInput.value = `@${profileUsername}`;
             } else if (hasUser) {
-                usernameInput.value = 'Username required for leaderboard';
+                usernameInput.value = 'Set username on /profile';
             } else {
                 usernameInput.value = '';
                 usernameInput.placeholder = 'Login required';
             }
-        }
-
-        if (editUsernameBtn) {
-            const canEditUsername = hasUser;
-            editUsernameBtn.disabled = !canEditUsername;
-            editUsernameBtn.textContent = (hasUser && profileUsername) ? 'Edit Username' : 'Set Username';
-            editUsernameBtn.title = canEditUsername ? 'Open username editor' : 'Login required';
         }
     },
 
@@ -746,6 +858,57 @@ const CloudSystem = {
         if (submitBtn) submitBtn.disabled = true;
 
         try {
+            const accountBridge = window.PlatformAccountBridge;
+            if (accountBridge && typeof accountBridge.getSessionState === 'function') {
+                const bridgeResult = this.authMode === 'signup'
+                    ? await accountBridge.signUp({ email, password })
+                    : await accountBridge.signIn({ email, password });
+
+                if (!bridgeResult || !bridgeResult.ok) {
+                    this._setAuthFeedback('Auth failed: ' + (bridgeResult?.error || 'Unknown account error.'), 'error');
+                    return false;
+                }
+
+                const state = bridgeResult.state || await accountBridge.getSessionState();
+                const fisherUser = state?.fisher?.user || null;
+
+                if (this.authMode === 'signup') {
+                    if (bridgeResult.requiresVerification) {
+                        this._setAuthFeedback('Signup created. Verify your email, then login.', 'success');
+                    } else {
+                        this._setAuthFeedback('Signup successful. Account linked across platform.', 'success');
+                    }
+
+                    if (bridgeResult.warnings && bridgeResult.warnings.length > 0) {
+                        console.warn('Platform account warnings:', bridgeResult.warnings.join(' | '));
+                    }
+
+                    if (fisherUser) {
+                        // handleLoginSuccess and loadFromCloud are handled by onAuthStateChange
+                        this.closeAuthModal();
+                    } else {
+                        this.authMode = 'login';
+                        this._syncAuthModalMode();
+                        if (passwordInput) passwordInput.value = '';
+                        this._updateAuthPasswordChecklist('');
+                    }
+                } else {
+                    if (!fisherUser) {
+                        this._setAuthFeedback('Login finished, but Fisher session is unavailable. Verify account setup.', 'error');
+                        return false;
+                    }
+
+                    if (bridgeResult.warnings && bridgeResult.warnings.length > 0) {
+                        this.game?.log('Account linked with warnings. Open Home for details.');
+                        console.warn('Platform account warnings:', bridgeResult.warnings.join(' | '));
+                    }
+
+                    // handleLoginSuccess and loadFromCloud are handled by onAuthStateChange
+                    this.closeAuthModal();
+                }
+                return false;
+            }
+
             if (this.authMode === 'signup') {
                 const { error } = await cloudSupabaseClient.auth.signUp({
                     email,
@@ -769,10 +932,9 @@ const CloudSystem = {
                     this._setAuthFeedback('Login failed: ' + error.message, 'error');
                     return false;
                 }
+                // handleLoginSuccess and loadFromCloud are handled by onAuthStateChange
                 if (data && data.user) {
-                    this.handleLoginSuccess(data.user);
                     this.closeAuthModal();
-                    await this.loadFromCloud({ force: true });
                 }
             }
         } finally {
@@ -784,16 +946,30 @@ const CloudSystem = {
 
     logout: async function () {
         if (!cloudSupabaseClient) return;
+        try {
+            await this.flushPlaytime();
+        } catch (err) {
+            console.warn('Final playtime flush failed during logout:', err?.message || err);
+        }
         this.pendingCloudSync = false;
         this.cloudSyncInFlight = false;
         this._clearCloudSyncRetry();
         this.cleanupSingleSessionEnforcement();
         this.closeAccountModal();
+        const accountBridge = window.PlatformAccountBridge;
+        if (accountBridge && typeof accountBridge.signOut === 'function') {
+            await accountBridge.signOut();
+            return;
+        }
         await cloudSupabaseClient.auth.signOut();
     },
 
     handleLoginSuccess: function (user) {
         const previousUserId = this.user ? this.user.id : null;
+        if (previousUserId && previousUserId !== user.id) {
+            this._syncPlaytimeActivity(true);
+            this.playtimePendingMs = 0;
+        }
         this.user = user;
         this.sessionActive = true;
 
@@ -806,6 +982,7 @@ const CloudSystem = {
         if (this.game) this.game.log(`Cloud login: ${user.email}`);
 
         this.initSingleSessionEnforcement(user.id);
+        this._syncPlaytimeActivity();
         if (this.pendingCloudSync && this._isOnline()) {
             this.saveToCloud().catch((err) => {
                 console.warn('Cloud sync after login failed:', err?.message || err);
@@ -912,6 +1089,10 @@ const CloudSystem = {
     forceLogoutUI: function () {
         if (!this.sessionActive) return;
 
+        this._syncPlaytimeActivity(true);
+        this.flushPlaytime().catch((err) => {
+            console.warn('Playtime flush failed during tab handoff:', err?.message || err);
+        });
         this.sessionActive = false;
         this.cleanupSingleSessionEnforcement({ resetSessionState: false });
 
@@ -948,7 +1129,7 @@ const CloudSystem = {
 
         this.updateUI();
 
-        const buttonsToDisable = ['action-btn', 'auto-fish-btn', 'btn-login', 'btn-login-text', 'btn-signup', 'btn-logout'];
+        const buttonsToDisable = ['action-btn', 'auto-fish-btn', 'btn-login', 'btn-login-text', 'btn-signup'];
         buttonsToDisable.forEach((id) => {
             const btn = document.getElementById(id);
             if (!btn) return;
@@ -1023,19 +1204,16 @@ const CloudSystem = {
         const btnAccount = document.getElementById('btn-login');
         const btnLogin = document.getElementById('btn-login-text');
         const btnSignup = document.getElementById('btn-signup');
-        const btnLogout = document.getElementById('btn-logout');
         const status = document.getElementById('user-status');
         const accountStatus = document.getElementById('account-cloud-status');
         const statusText = this._getCloudStatusText();
 
         if (this.user) {
             if (btnAccount) btnAccount.style.display = 'inline-flex';
-            if (btnLogout) btnLogout.style.display = 'inline-flex';
             if (btnLogin) btnLogin.style.display = 'none';
             if (btnSignup) btnSignup.style.display = 'none';
         } else {
             if (btnAccount) btnAccount.style.display = 'none';
-            if (btnLogout) btnLogout.style.display = 'none';
             if (btnLogin) btnLogin.style.display = 'inline-flex';
             if (btnSignup) btnSignup.style.display = 'none';
             this.closeAccountModal();
@@ -1063,6 +1241,12 @@ const CloudSystem = {
         if (this.cloudSyncInFlight) {
             this.pendingCloudSync = true;
             return;
+        }
+
+        try {
+            await this.flushPlaytime();
+        } catch (err) {
+            console.warn('Playtime flush before cloud save failed:', err?.message || err);
         }
 
         this.cloudSyncInFlight = true;
@@ -1236,23 +1420,10 @@ CloudSystem._bindGlobalErrorHandlers();
 window.AuthAPI = {
     login: () => CloudSystem.login(),
     signup: () => CloudSystem.signup(),
-    logout: () => CloudSystem.logout(),
     openAccount: () => CloudSystem.openAccountModal(),
-    openUsernameEditor: () => {
-        if (typeof CloudSystem.openUsernameEditor === 'function') {
-            return CloudSystem.openUsernameEditor();
-        }
-        return false;
-    },
     closeAccountModal: () => CloudSystem.closeAccountModal(),
     testAlert: () => CloudSystem.sendTestErrorAlert(),
     closeAuthModal: () => CloudSystem.closeAuthModal(),
     setAuthMode: (mode) => CloudSystem.setAuthMode(mode),
     submitAuth: (event) => CloudSystem.submitAuth(event)
 };
-
-
-
-
-
-

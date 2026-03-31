@@ -71,19 +71,19 @@ export default function LandingPage() {
         <section className={styles.columns}>
           <article className={styles.column}>
             <p className={styles.columnTag}>Community</p>
-            <h2>Connect, compete, and chat.</h2>
+            <h2>Connect, compete, and track both games.</h2>
             <p>
-              Follow friends, climb leaderboards, earn achievements, and chat with the community in
-              real-time. One platform for everything.
+              Follow friends, climb leaderboards, earn achievements, and manage one public username
+              across Virtual Fisher and Virtual Farmer.
             </p>
           </article>
 
           <article className={styles.column}>
-            <p className={styles.columnTag}>Marketplace</p>
-            <h2>Gear up in the shop.</h2>
+            <p className={styles.columnTag}>Profile Hub</p>
+            <h2>One profile for both worlds.</h2>
             <p>
-              Spend coins on rods, bait, amulets, boosts, and cosmetics. Rarer items give bigger bonuses.
-              Save up for legendary gear.
+              Open your account profile to manage your username, review your email-linked account, and
+              track cross-game playtime from one page.
             </p>
           </article>
         </section>
@@ -98,14 +98,8 @@ export default function LandingPage() {
             <Link className={styles.primary} href="/home">
               Go To Platform Home
             </Link>
-            <Link className={styles.secondary} href="/shop">
-              Shop
-            </Link>
-            <Link className={styles.secondary} href="/chat">
-              Chat
-            </Link>
-            <Link className={styles.secondary} href="/search">
-              Search
+            <Link className={styles.secondary} href="/profile">
+              My Profile
             </Link>
           </div>
         </section>

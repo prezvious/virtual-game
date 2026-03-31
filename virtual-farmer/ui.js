@@ -664,8 +664,8 @@ function renderLeaderboardTable(bodyId, rows, metric) {
 
     const currentUserId = window.VirtualFarmerSupabase?.getCurrentUser()?.id || null;
     body.innerHTML = rows.map((row, index) => {
-        const displayName = row?.display_name || `Farmer-${String(row?.user_id || "").slice(0, 8)}`;
-        const safeDisplayName = escapeHtml(displayName);
+        const username = row?.username || row?.display_name || "Unknown";
+        const safeDisplayName = escapeHtml(username.startsWith("@") ? username : `@${username}`);
         const value =
             metric === "total_plants" ? row.total_plants :
             metric === "balance" ? row.balance :
@@ -833,8 +833,7 @@ function updateSignedInUserPanel() {
     const playerNameEl = document.getElementById('player-display-name');
     const loginBtn = document.getElementById('login-btn');
     const signupBtn = document.getElementById('signup-btn');
-    const signOutBtn = document.getElementById('signout-btn');
-    if (!playerNameEl || !loginBtn || !signupBtn || !signOutBtn) return;
+    if (!playerNameEl || !loginBtn || !signupBtn) return;
 
     const next = encodeURIComponent('game.html');
     loginBtn.href = `login.html?next=${next}`;
@@ -845,7 +844,6 @@ function updateSignedInUserPanel() {
         playerNameEl.textContent = 'Local Mode';
         loginBtn.hidden = false;
         signupBtn.hidden = false;
-        signOutBtn.hidden = true;
         return;
     }
 
@@ -853,15 +851,14 @@ function updateSignedInUserPanel() {
         playerNameEl.textContent = 'Not Signed In';
         loginBtn.hidden = false;
         signupBtn.hidden = false;
-        signOutBtn.hidden = true;
         return;
     }
 
     const currentUser = supabaseApi.getCurrentUser();
-    playerNameEl.textContent = currentUser?.email || supabaseApi.getDisplayName();
+    const username = typeof supabaseApi.getUsername === "function" ? supabaseApi.getUsername() : "";
+    playerNameEl.textContent = username ? `@${username}` : (currentUser?.email || "Signed In");
     loginBtn.hidden = true;
     signupBtn.hidden = true;
-    signOutBtn.hidden = false;
 }
 
 // ==================== EVENT LISTENERS ====================
@@ -907,18 +904,6 @@ function setupEventListeners() {
     if (refreshLeaderboardBtn) {
         refreshLeaderboardBtn.addEventListener('click', async () => {
             await refreshLeaderboard({ force: true });
-        });
-    }
-
-    const signOutBtn = document.getElementById('signout-btn');
-    if (signOutBtn) {
-        signOutBtn.addEventListener('click', async () => {
-            const supabaseApi = window.VirtualFarmerSupabase;
-            if (!supabaseApi || !supabaseApi.isAuthenticated()) return;
-
-            signOutBtn.disabled = true;
-            await supabaseApi.signOut({ redirectTo: 'login.html?next=game.html' });
-            signOutBtn.disabled = false;
         });
     }
 
@@ -1040,6 +1025,11 @@ async function init() {
 
         if (supabaseApi && supabaseApi.isAuthenticated()) {
             await refreshLeaderboard({ force: true });
+        }
+
+        // Start weather polling
+        if (typeof startWeatherPolling === 'function') {
+            startWeatherPolling();
         }
 
         // Auto-save every 30 seconds

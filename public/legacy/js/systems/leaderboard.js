@@ -1,6 +1,6 @@
 /**
  * CLOUD EXTENSIONS
- * Adds username enforcement + public leaderboard rendering on top of CloudSystem.
+ * Adds public leaderboard rendering and shared username awareness on top of CloudSystem.
  */
 
 (function () {
@@ -20,6 +20,8 @@
     const LEADERBOARD_REFRESH_MS = 20 * 60 * 1000;
     const LEADERBOARD_ENTRY_LIMIT = 10;
     const LEADERBOARD_FETCH_TIMEOUT_MS = 12000;
+    const USERNAME_AUTH_LOCK_RETRY_ATTEMPTS = 2;
+    const USERNAME_AUTH_LOCK_RETRY_DELAY_MS = 180;
 
     const extensionSupabaseClient = (typeof cloudSupabaseClient !== 'undefined' && cloudSupabaseClient)
         ? cloudSupabaseClient
@@ -90,6 +92,16 @@
             el.classList.add('is-error');
         }
     };
+    CloudSystem._wait = function (delayMs) {
+        return new Promise((resolve) => {
+            setTimeout(resolve, Math.max(0, Number(delayMs) || 0));
+        });
+    };
+    CloudSystem._isAuthLockContentionError = function (error) {
+        const message = String(typeof error === 'string' ? error : error?.message || '').toLowerCase();
+        return message.includes('auth-token')
+            && (message.includes('another request stole it') || message.includes('was released because another request stole it'));
+    };
     CloudSystem._looksLikeRpcSignatureCacheError = function (error, fnName) {
         const message = String(error?.message || '');
         return /schema cache/i.test(message) && message.includes(fnName);
@@ -98,6 +110,10 @@
     CloudSystem._formatUsernameRpcError = function (fnName, error) {
         const fallbackMessage = 'Could not verify username availability.';
         if (!error) return fallbackMessage;
+
+        if (this._isAuthLockContentionError(error)) {
+            return 'Session sync is still finishing. Try saving your username again in a moment.';
+        }
 
         if (this._looksLikeRpcSignatureCacheError(error, fnName)) {
             return 'Username service is not installed on the database yet. Apply migration 20260309_usernames_and_leaderboards.sql.';
@@ -122,35 +138,54 @@
             return { ok: false, reason: 'You must be logged in first.' };
         }
 
-        try {
-            const { data, error } = await extensionSupabaseClient
-                .from('user_profiles')
-                .upsert({
-                    user_id: this.user.id,
-                    username: normalizedCandidate,
-                    username_normalized: normalizedCandidate,
-                    username_set_at: new Date().toISOString()
-                }, { onConflict: 'user_id' })
-                .select('username, username_normalized, username_set_at')
-                .single();
+        for (let attempt = 1; attempt <= USERNAME_AUTH_LOCK_RETRY_ATTEMPTS; attempt += 1) {
+            try {
+                const { data, error } = await extensionSupabaseClient
+                    .from('user_profiles')
+                    .upsert({
+                        user_id: this.user.id,
+                        username: normalizedCandidate,
+                        username_normalized: normalizedCandidate,
+                        username_set_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' })
+                    .select('username, username_normalized, username_set_at')
+                    .single();
 
-            if (error) {
-                const code = String(error.code || '').toUpperCase();
-                if (code === '23505') {
-                    return { ok: false, reason: 'That username is already in use.' };
+                if (error) {
+                    if (this._isAuthLockContentionError(error) && attempt < USERNAME_AUTH_LOCK_RETRY_ATTEMPTS) {
+                        await this._wait(USERNAME_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                        continue;
+                    }
+                    if (this._isAuthLockContentionError(error)) {
+                        return { ok: false, reason: 'Session sync is still finishing. Try saving your username again in a moment.' };
+                    }
+
+                    const code = String(error.code || '').toUpperCase();
+                    if (code === '23505') {
+                        return { ok: false, reason: 'That username is already in use.' };
+                    }
+                    return { ok: false, reason: error.message || 'Could not save username.' };
                 }
-                return { ok: false, reason: error.message || 'Could not save username.' };
-            }
 
-            return {
-                ok: true,
-                username: data?.username || normalizedCandidate,
-                normalized: data?.username_normalized || normalizedCandidate,
-                username_set_at: data?.username_set_at || new Date().toISOString()
-            };
-        } catch (err) {
-            return { ok: false, reason: err?.message || 'Could not save username.' };
+                return {
+                    ok: true,
+                    username: data?.username || normalizedCandidate,
+                    normalized: data?.username_normalized || normalizedCandidate,
+                    username_set_at: data?.username_set_at || new Date().toISOString()
+                };
+            } catch (err) {
+                if (this._isAuthLockContentionError(err) && attempt < USERNAME_AUTH_LOCK_RETRY_ATTEMPTS) {
+                    await this._wait(USERNAME_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                    continue;
+                }
+                if (this._isAuthLockContentionError(err)) {
+                    return { ok: false, reason: 'Session sync is still finishing. Try saving your username again in a moment.' };
+                }
+                return { ok: false, reason: err?.message || 'Could not save username.' };
+            }
         }
+
+        return { ok: false, reason: 'Could not save username.' };
     };
 
     CloudSystem._callUsernameRpc = async function (fnName, candidate) {
@@ -159,23 +194,45 @@
             { p_candidate: candidate }
         ];
 
-        let firstError = null;
-        for (const payload of payloads) {
-            try {
-                const { data, error } = await extensionSupabaseClient.rpc(fnName, payload);
-                if (!error) return { data, error: null };
-                if (!firstError) firstError = error;
+        for (let attempt = 1; attempt <= USERNAME_AUTH_LOCK_RETRY_ATTEMPTS; attempt += 1) {
+            let firstError = null;
+            let lockError = null;
 
-                if (!this._looksLikeRpcSignatureCacheError(error, fnName)) {
-                    return { data: null, error };
+            for (const payload of payloads) {
+                try {
+                    const { data, error } = await extensionSupabaseClient.rpc(fnName, payload);
+                    if (!error) return { data, error: null };
+                    if (!firstError) firstError = error;
+
+                    if (this._isAuthLockContentionError(error)) {
+                        lockError = error;
+                        continue;
+                    }
+
+                    if (!this._looksLikeRpcSignatureCacheError(error, fnName)) {
+                        return { data: null, error };
+                    }
+                } catch (err) {
+                    if (!firstError) firstError = err;
+
+                    if (this._isAuthLockContentionError(err)) {
+                        lockError = err;
+                        continue;
+                    }
+
+                    return { data: null, error: err };
                 }
-            } catch (err) {
-                if (!firstError) firstError = err;
-                return { data: null, error: err };
             }
+
+            if (lockError && attempt < USERNAME_AUTH_LOCK_RETRY_ATTEMPTS) {
+                await this._wait(USERNAME_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                continue;
+            }
+
+            return { data: null, error: lockError || firstError };
         }
 
-        return { data: null, error: firstError };
+        return { data: null, error: new Error('Could not reach the username service.') };
     };
 
     CloudSystem._toBooleanLike = function (value) {
@@ -570,7 +627,7 @@
         if (!el) return;
 
         if (!this.user) {
-            el.textContent = 'Sign in and set a username to appear on the leaderboard.';
+            el.textContent = 'Sign in, then set a username on /profile to appear on the leaderboard.';
             return;
         }
 
@@ -579,11 +636,7 @@
             return;
         }
 
-        if (this.usernamePromptSkippedThisSession) {
-            el.textContent = 'You skipped username setup. Your account is excluded from the leaderboard until a username is saved.';
-        } else {
-            el.textContent = 'Username required: set your username to join global leaderboards.';
-        }
+        el.textContent = 'Set a username on /profile to join global leaderboards in Virtual Fisher and Virtual Farmer.';
     };
 
     CloudSystem._renderLeaderboardRows = function (listId, rows) {
@@ -792,21 +845,6 @@
         if (modal) modal.classList.add('active');
     };
 
-    CloudSystem.openUsernameEditor = function () {
-        if (!this.user) {
-            if (typeof this.openAuthModal === 'function') {
-                this.openAuthModal('login');
-            }
-            return;
-        }
-
-        if (typeof this.closeAccountModal === 'function') {
-            this.closeAccountModal();
-        }
-
-        this.openUsernameModal({ required: false });
-    };
-
     CloudSystem.closeUsernameModal = function () {
         if (this.usernamePromptRequired && !this.usernamePromptSkippedThisSession && !this._hasUsername()) {
             this._setUsernameModalFeedback('Set a username or explicitly skip to continue without leaderboard access.', 'error');
@@ -819,101 +857,6 @@
         if (modal) modal.classList.remove('active');
         this._setUsernameModalFeedback('');
         return true;
-    };
-
-    CloudSystem.skipUsernameSetup = function () {
-        this.usernamePromptSkippedThisSession = true;
-        this.usernamePromptRequired = false;
-        this.closeUsernameModal();
-        this._updateLeaderboardUserNote();
-        this.updateUI();
-    };
-
-    CloudSystem.submitUsername = async function (event) {
-        if (event) event.preventDefault();
-        if (!this.user) {
-            this._setUsernameModalFeedback('You must be logged in first.', 'error');
-            return false;
-        }
-        if (!extensionSupabaseClient) {
-            this._setUsernameModalFeedback('Supabase is not available.', 'error');
-            return false;
-        }
-
-        const input = document.getElementById('username-required-input');
-        const submitBtn = document.getElementById('username-submit-btn');
-        const value = (input?.value || '').trim();
-
-        const normalizedInput = this._normalizeUsername(value);
-        const check = (this._hasUsername() && normalizedInput === this.profile.username_normalized)
-            ? { ok: true, available: true, normalized: normalizedInput, reason: 'Username is unchanged.' }
-            : await this.checkUsernameAvailability(value);
-        const normalizedCandidate = check.normalized || normalizedInput;
-        const availabilityFalsePositive = this._isConsecutiveUnderscoreFalsePositive(
-            check.reason,
-            normalizedCandidate
-        );
-
-        if (!check.ok || (!check.available && !availabilityFalsePositive)) {
-            this._setUsernameModalFeedback(check.reason || 'Username is not available.', 'error');
-            return false;
-        }
-
-        this._setUsernameModalFeedback('Saving username...');
-        if (submitBtn) submitBtn.disabled = true;
-
-        try {
-            let savedProfile = null;
-            const { data, error } = await this._callUsernameRpc('claim_username', normalizedCandidate);
-            let claimFailureReason = '';
-
-            if (!error && data && data.ok === true) {
-                savedProfile = {
-                    username: data.username || normalizedCandidate,
-                    username_normalized: data.normalized || normalizedCandidate,
-                    username_set_at: new Date().toISOString()
-                };
-            } else {
-                claimFailureReason = error
-                    ? this._formatUsernameRpcError('claim_username', error)
-                    : (data?.reason || 'Could not save username.');
-            }
-
-            if (!savedProfile && this._isConsecutiveUnderscoreFalsePositive(claimFailureReason, normalizedCandidate)) {
-                const fallbackSave = await this._saveUsernameWithoutRpc(normalizedCandidate);
-                if (!fallbackSave.ok) {
-                    this._setUsernameModalFeedback(fallbackSave.reason || 'Could not save username.', 'error');
-                    return false;
-                }
-
-                savedProfile = {
-                    username: fallbackSave.username || normalizedCandidate,
-                    username_normalized: fallbackSave.normalized || normalizedCandidate,
-                    username_set_at: fallbackSave.username_set_at || new Date().toISOString()
-                };
-            }
-
-            if (!savedProfile) {
-                this._setUsernameModalFeedback(claimFailureReason || 'Could not save username.', 'error');
-                return false;
-            }
-
-            this.profile = savedProfile;
-
-            this.usernamePromptRequired = false;
-            this.usernamePromptSkippedThisSession = false;
-            this._setUsernameModalFeedback('Username saved successfully.', 'success');
-            this.updateUI();
-            this._updateLeaderboardUserNote();
-
-            this.closeUsernameModal();
-            await this.refreshLeaderboards();
-            if (this.game) this.game.log(`Username updated: @${this.profile.username_normalized}`);
-        } finally {
-            if (submitBtn) submitBtn.disabled = false;
-        }
-
-        return false;
     };
 
     CloudSystem._enforceUsernameRequirement = function () {
@@ -937,97 +880,11 @@
     const originalSyncAuthModalMode = CloudSystem._syncAuthModalMode.bind(CloudSystem);
     CloudSystem._syncAuthModalMode = function () {
         originalSyncAuthModalMode();
-
-        const isSignup = this.authMode === 'signup';
-        const signupBlock = document.getElementById('auth-username-block');
-        const usernameInput = document.getElementById('auth-username');
-
-        if (signupBlock) signupBlock.hidden = !isSignup;
-        if (usernameInput) {
-            usernameInput.disabled = !isSignup;
-            usernameInput.required = isSignup;
-            usernameInput.autocomplete = 'username';
-            if (!isSignup) {
-                this._setInlineUsernameFeedback('auth-username-feedback', '');
-            }
-        }
     };
 
     const originalSubmitAuth = CloudSystem.submitAuth.bind(CloudSystem);
     CloudSystem.submitAuth = async function (event) {
-        if (this.authMode !== 'signup') {
-            return originalSubmitAuth(event);
-        }
-
-        if (event) event.preventDefault();
-        if (!extensionSupabaseClient) {
-            this._setAuthFeedback('Supabase is not available.', 'error');
-            return false;
-        }
-
-        const emailInput = document.getElementById('auth-email');
-        const passwordInput = document.getElementById('auth-password');
-        const usernameInput = document.getElementById('auth-username');
-        const submitBtn = document.getElementById('auth-submit-btn');
-
-        const email = (emailInput?.value || '').trim();
-        const password = passwordInput?.value || '';
-        const username = (usernameInput?.value || '').trim();
-
-        if (!email || !password || !username) {
-            this._setAuthFeedback('Email, password, and username are required.', 'error');
-            return false;
-        }
-        const passwordValidation = this._validateAuthPasswordRequirements(password);
-        if (!passwordValidation.ok) {
-            this._setAuthFeedback(passwordValidation.reason, 'error');
-            return false;
-        }
-
-        const availability = await this.checkUsernameAvailability(username);
-        if (!availability.ok || !availability.available) {
-            this._setAuthFeedback(availability.reason || 'Username is unavailable.', 'error');
-            this._setInlineUsernameFeedback('auth-username-feedback', availability.reason || 'Username is unavailable.', 'error');
-            return false;
-        }
-
-        this._setAuthFeedback('Creating account...');
-        if (submitBtn) submitBtn.disabled = true;
-
-        try {
-            const { data, error } = await extensionSupabaseClient.auth.signUp({
-                email,
-                password,
-                options: {
-                    emailRedirectTo: this._getAuthCallbackUrl(),
-                    data: {
-                        username: availability.normalized
-                    }
-                }
-            });
-
-            if (error) {
-                this._setAuthFeedback('Signup failed: ' + error.message, 'error');
-                return false;
-            }
-
-            // handleLoginSuccess and loadFromCloud are handled by onAuthStateChange
-            if (data?.session && data?.user) {
-                this.closeAuthModal();
-            }
-
-            this._setAuthFeedback('Signup successful. Verify email if required, then login.', 'success');
-            this.authMode = 'login';
-            this._syncAuthModalMode();
-            if (passwordInput) passwordInput.value = '';
-            this._updateAuthPasswordChecklist('');
-            if (usernameInput) usernameInput.value = '';
-            this._setInlineUsernameFeedback('auth-username-feedback', '');
-        } finally {
-            if (submitBtn) submitBtn.disabled = false;
-        }
-
-        return false;
+        return originalSubmitAuth(event);
     };
 
     const originalHandleLoginSuccess = CloudSystem.handleLoginSuccess.bind(CloudSystem);
@@ -1041,7 +898,6 @@
 
         try {
             await this.loadUserProfile();
-            this._enforceUsernameRequirement();
             await this.refreshLeaderboards();
         } catch (err) {
             console.warn('Post-login profile/leaderboard setup failed:', err?.message || err);
@@ -1055,7 +911,6 @@
         this.profile = null;
         this.usernamePromptRequired = false;
         this.usernamePromptSkippedThisSession = false;
-        this.closeUsernameModal();
         this.updateUI();
         this._updateLeaderboardUserNote();
         return originalLogout();
@@ -1088,7 +943,6 @@
 
     const originalInit = CloudSystem.init.bind(CloudSystem);
     CloudSystem.init = async function (gameInstance) {
-        this._bindUsernameInputs();
         this.initLeaderboards();
 
         if (!this.usernameWatcherBound && extensionSupabaseClient) {
@@ -1098,7 +952,6 @@
                     this.profile = null;
                     this.usernamePromptRequired = false;
                     this.usernamePromptSkippedThisSession = false;
-                    this.closeUsernameModal();
                     this._updateLeaderboardUserNote();
                     this.refreshLeaderboards().catch(() => {});
                 }
@@ -1106,25 +959,13 @@
         }
 
         await originalInit(gameInstance);
-        this._bindUsernameInputs();
 
         if (this.user) {
             await this.loadUserProfile();
-            this._enforceUsernameRequirement();
         }
 
         await this.refreshLeaderboards();
     };
 
-    if (window.AuthAPI) {
-        window.AuthAPI.closeUsernameModal = () => CloudSystem.closeUsernameModal();
-        window.AuthAPI.openUsernameEditor = () => CloudSystem.openUsernameEditor();
-        window.AuthAPI.submitUsername = (event) => CloudSystem.submitUsername(event);
-        window.AuthAPI.skipUsernameSetup = () => CloudSystem.skipUsernameSetup();
-    }
 })();
-
-
-
-
 

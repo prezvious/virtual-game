@@ -258,6 +258,9 @@ function queueCloudProgressSave(immediate = false) {
     const supabaseApi = window.VirtualFarmerSupabase;
     if (!supabaseApi || !supabaseApi.isAuthenticated()) return;
     supabaseApi.queueSave(getProgressSnapshotForCloud(), { immediate });
+    if (typeof supabaseApi.flushPlaytime === "function") {
+        void supabaseApi.flushPlaytime();
+    }
 }
 
 function applyCloudProgressRow(progressRow) {

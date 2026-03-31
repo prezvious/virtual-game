@@ -256,7 +256,6 @@
         if (!form) return;
 
         const submitBtn = form.querySelector("button[type='submit']");
-        const displayNameInput = document.getElementById("signup-display-name");
         const emailInput = document.getElementById("signup-email");
         const confirmPasswordInput = document.getElementById("signup-confirm-password");
         const passwordInput = document.getElementById("signup-password");
@@ -267,18 +266,16 @@
         });
 
         const syncSignupSubmitState = () => {
-            const displayName = displayNameInput?.value.trim() || "";
             const email = emailInput?.value.trim() || "";
             const confirmPassword = confirmPasswordInput?.value || "";
             const password = passwordField?.getPassword() || "";
             const validation = passwordField?.getValidation() || validatePassword("");
-            const allFieldsFilled = Boolean(displayName && email && password && confirmPassword);
+            const allFieldsFilled = Boolean(email && password && confirmPassword);
             const passwordsMatch = password === confirmPassword;
             syncSubmitAvailability(submitBtn, allFieldsFilled && passwordsMatch, validation.isValid);
         };
 
         wireStatusReset(form);
-        displayNameInput?.addEventListener("input", syncSignupSubmitState);
         emailInput?.addEventListener("input", syncSignupSubmitState);
         confirmPasswordInput?.addEventListener("input", syncSignupSubmitState);
         passwordInput?.addEventListener("input", syncSignupSubmitState);
@@ -286,13 +283,12 @@
 
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
-            const displayName = displayNameInput?.value.trim() || "";
             const email = emailInput?.value.trim() || "";
             const password = passwordField?.getPassword() || "";
             const confirmPassword = confirmPasswordInput?.value || "";
             const validation = passwordField?.syncValidationUI() || validatePassword(password);
 
-            if (!displayName || !email || !password || !confirmPassword) {
+            if (!email || !password || !confirmPassword) {
                 setStatus("Fill out all required fields.", "error");
                 syncSignupSubmitState();
                 return;
@@ -318,7 +314,7 @@
             setStatus("Creating account...");
 
             try {
-                const result = await supabaseApi.signUp({ email, password, displayName });
+                const result = await supabaseApi.signUp({ email, password });
                 if (result.session) {
                     setStatus("Account created. Redirecting...", "success");
                     window.location.href = nextTarget;
