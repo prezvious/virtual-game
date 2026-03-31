@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getClientSupabase } from "@/lib/auth-client";
+import PublicProfileHub from "@/components/profile/PublicProfileHub";
 import styles from "@/app/profile/profile.module.css";
 
 type Achievement = {
@@ -236,15 +237,7 @@ export default function SelfProfileClient() {
   }
 
   if (!authenticated) {
-    return (
-      <div className={styles.shell}>
-        <div className={styles.errorCard}>
-          <h2>Sign in to open your profile</h2>
-          <p>Your account overview, username, and cross-game playtime live here now.</p>
-          <Link href="/home" className={styles.btnPrimary}>Go to Platform Home</Link>
-        </div>
-      </div>
-    );
+    return <PublicProfileHub />;
   }
 
   if (error || !profile) {

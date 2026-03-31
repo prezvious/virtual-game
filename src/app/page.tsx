@@ -99,7 +99,7 @@ export default function LandingPage() {
               Go To Platform Home
             </Link>
             <Link className={styles.secondary} href="/profile">
-              My Profile
+              Browse Profiles
             </Link>
           </div>
         </section>

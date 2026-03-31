@@ -192,29 +192,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Username required." }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const serviceClient = createServiceSupabaseClient();
 
-  const { data: profile, error } = await supabase
+  const { data: profile, error } = await serviceClient
     .from("user_profiles")
     .select("user_id, username, avatar_url, bio, is_admin, created_at, last_seen_at")
     .ilike("username", username)
-    .single();
+    .maybeSingle();
 
   if (error || !profile) {
     return NextResponse.json({ ok: false, error: "User not found." }, { status: 404 });
   }
 
-  const { count: followersCount } = await supabase
+  const { count: followersCount } = await serviceClient
     .from("follows")
     .select("*", { count: "exact", head: true })
     .eq("following_id", profile.user_id);
 
-  const { count: followingCount } = await supabase
+  const { count: followingCount } = await serviceClient
     .from("follows")
     .select("*", { count: "exact", head: true })
     .eq("follower_id", profile.user_id);
 
-  const { data: achievements } = await supabase
+  const { data: achievements } = await serviceClient
     .from("user_achievements")
     .select("achievement_id, unlocked_at, achievements(name, icon, rarity)")
     .eq("user_id", profile.user_id)

@@ -41,9 +41,11 @@ Then open `http://localhost:8080/game.html`.
 
 1. Create a Supabase project.
 2. Run `supabase/001_progress_schema.sql` in Supabase SQL Editor.
-3. Set `window.__SUPABASE_CONFIG__` in `supabase/config.js` with your project URL and anon key.
-4. Enable Email auth provider in Supabase Auth.
-5. If email confirmation is enabled, verify the email before first login.
+3. Generate `/runtime-supabase-config.js` from the root project with `npm run sync-public-auth-config`.
+4. Make sure your root `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` env values are set before generating.
+5. `supabase/config.js` will read the generated runtime config automatically.
+6. Enable Email auth provider in Supabase Auth.
+7. If email confirmation is enabled, verify the email before first login.
 
 ## Save and Sync Behavior
 
@@ -65,6 +67,7 @@ Behavior summary:
 Compared with `virtual-farmer/`:
 
 - Supabase JS is loaded from `/vendor/supabase/supabase.js` (not CDN)
+- Runtime auth config is loaded from `/runtime-supabase-config.js`
 - Account bridge script is expected at `/platform-account-bridge.js` from root `public/`
 - This copy is the one embedded by route `/farm`
 

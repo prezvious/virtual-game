@@ -8,11 +8,10 @@ This folder contains the SQL and browser config used by the Next-served Virtual 
 
 1. Create a Supabase project.
 2. In SQL Editor, run `001_progress_schema.sql`.
-3. Open `config.js` and set `window.__SUPABASE_CONFIG__`:
-   - `url`: `https://<project-ref>.supabase.co`
-   - `anonKey`: your Supabase anon key
-4. In Supabase Auth, enable the Email provider.
-5. If you enable email confirmation, complete confirmation before first login.
+3. From the repo root, run `npm run sync-public-auth-config`.
+4. The generated `/runtime-supabase-config.js` file will be read by `config.js` automatically.
+5. In Supabase Auth, enable the Email provider.
+6. If you enable email confirmation, complete confirmation before first login.
 
 ## What The SQL Creates
 
@@ -49,4 +48,4 @@ Leaderboard reads are pulled from `public.leaderboard` for:
 ## Practical Notes
 
 - If Supabase config is missing, the game can still run with local save only.
-- Keep `config.js` synced with the project used by your auth and database tables.
+- Keep the root `NEXT_PUBLIC_SUPABASE_*` env values synced with the project used by your auth and database tables before regenerating the runtime config.

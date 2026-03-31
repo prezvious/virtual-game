@@ -1,21 +1,13 @@
 (function initPlatformAccountBridge() {
-    const FISHER_CONFIG = {
-        name: 'fisher',
-        label: 'Virtual Fisher',
-        url: 'https://YOUR_PROJECT_REF.example.invalid',
-        anonKey: 'YOUR_SUPABASE_ANON_KEY'
-    };
-
-    const FARMER_CONFIG = {
-        name: 'farmer',
-        label: 'Virtual Farmer',
-        url: 'https://YOUR_PROJECT_REF.example.invalid',
-        anonKey: 'YOUR_SUPABASE_ANON_KEY'
-    };
-
     const PROJECTS = {
-        fisher: FISHER_CONFIG,
-        farmer: FARMER_CONFIG
+        fisher: {
+            name: 'fisher',
+            label: 'Virtual Fisher'
+        },
+        farmer: {
+            name: 'farmer',
+            label: 'Virtual Farmer'
+        }
     };
 
     const clients = {
@@ -28,6 +20,28 @@
         return String(value || '').trim();
     }
 
+    function getRuntimePlatformConfig() {
+        const config = window.__PLATFORM_SUPABASE_CONFIG__;
+        return config && typeof config === 'object' ? config : {};
+    }
+
+    function resolveProjectConfig(project) {
+        const runtimeConfig = getRuntimePlatformConfig();
+        const shared = runtimeConfig.shared && typeof runtimeConfig.shared === 'object'
+            ? runtimeConfig.shared
+            : {};
+        const projectRuntime = runtimeConfig[project.name] && typeof runtimeConfig[project.name] === 'object'
+            ? runtimeConfig[project.name]
+            : {};
+
+        return {
+            name: project.name,
+            label: project.label,
+            url: sanitizeText(projectRuntime.url || shared.url),
+            anonKey: sanitizeText(projectRuntime.anonKey || shared.anonKey)
+        };
+    }
+
     function hasProjectConfig(config) {
         const url = sanitizeText(config && config.url);
         const anonKey = sanitizeText(config && config.anonKey);
@@ -36,19 +50,23 @@
     }
 
     function getConfigurationError() {
+        const fisherConfig = getProjectConfig('fisher');
+        const farmerConfig = getProjectConfig('farmer');
         const missing = [];
-        if (!hasProjectConfig(FISHER_CONFIG)) missing.push(FISHER_CONFIG.label);
-        if (!hasProjectConfig(FARMER_CONFIG)) missing.push(FARMER_CONFIG.label);
+        if (!hasProjectConfig(fisherConfig)) missing.push(fisherConfig.label);
+        if (!hasProjectConfig(farmerConfig)) missing.push(farmerConfig.label);
         if (!missing.length) return '';
         return `${missing.join(' and ')} account sync is not configured for this local copy.`;
     }
 
     function usesSharedAuthBackend() {
-        if (!hasProjectConfig(FISHER_CONFIG) || !hasProjectConfig(FARMER_CONFIG)) {
+        const fisherConfig = getProjectConfig('fisher');
+        const farmerConfig = getProjectConfig('farmer');
+        if (!hasProjectConfig(fisherConfig) || !hasProjectConfig(farmerConfig)) {
             return false;
         }
-        return FISHER_CONFIG.url === FARMER_CONFIG.url
-            && FISHER_CONFIG.anonKey === FARMER_CONFIG.anonKey;
+        return fisherConfig.url === farmerConfig.url
+            && fisherConfig.anonKey === farmerConfig.anonKey;
     }
 
     function ensureEmail(value) {
@@ -75,7 +93,8 @@
     }
 
     function getProjectConfig(name) {
-        return PROJECTS[name] || null;
+        const project = PROJECTS[name] || null;
+        return project ? resolveProjectConfig(project) : null;
     }
 
     function getClient(name) {
@@ -191,6 +210,8 @@
             if (!sharedSessionStatePromise) {
                 sharedSessionStatePromise = readProjectSession('fisher')
                     .then((sharedState) => {
+                        const fisherConfig = getProjectConfig('fisher');
+                        const farmerConfig = getProjectConfig('farmer');
                         const sharedUser = sharedState.user || null;
                         const sharedSession = sharedState.session || null;
                         const sharedOk = sharedUser ? true : sharedState.ok;
@@ -199,7 +220,7 @@
                         const fisher = {
                             ...sharedState,
                             project: 'fisher',
-                            label: FISHER_CONFIG.label,
+                            label: fisherConfig.label,
                             ok: sharedOk,
                             user: sharedUser,
                             session: sharedSession,
@@ -209,7 +230,7 @@
                         const farmer = {
                             ...fisher,
                             project: 'farmer',
-                            label: FARMER_CONFIG.label
+                            label: farmerConfig.label
                         };
 
                         const primaryUser = sharedUser;
@@ -618,7 +639,7 @@
     }
 
     window.PlatformAccountBridge = {
-        version: '2026-04-01a',
+        version: '2026-04-01b',
         getSessionState,
         signIn,
         signUp,

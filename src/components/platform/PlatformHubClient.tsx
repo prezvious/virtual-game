@@ -405,7 +405,7 @@ export default function PlatformHubClient() {
             <p className={styles.sectionLabel}>Platform Features</p>
           </div>
           <div className={styles.sectionActions}>
-            <Link href="/profile" className={styles.btnGhost}>My Profile</Link>
+            <Link href="/profile" className={styles.btnGhost}>Profiles</Link>
             <Link href="/friends" className={styles.btnGhost}>Friends</Link>
             <Link href="/achievements" className={styles.btnGhost}>Achievements</Link>
           </div>

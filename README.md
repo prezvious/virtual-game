@@ -44,6 +44,7 @@ Open `http://localhost:3000`.
 Useful scripts:
 
 ```bash
+npm run sync-public-auth-config
 npm run build
 npm run start
 npm run lint
@@ -85,6 +86,7 @@ What may stay unavailable unless you add your own local account-sync setup:
 If you only want the original game runtimes without the Next.js shell around them, serve `public/` as static files:
 
 ```bash
+npm run sync-public-auth-config
 npx serve public -l 3000
 ```
 
@@ -94,6 +96,8 @@ Then open:
 - `http://localhost:3000/farmer-legacy/game.html`
 
 Avoid opening the HTML files with `file://`. A small local server is the safer option because workers, fetch calls, and a few browser APIs are much less fragile there.
+
+For auth-enabled static serving, `npm run sync-public-auth-config` generates `public/runtime-supabase-config.js` from your local `NEXT_PUBLIC_SUPABASE_*` env values before you launch the static server.
 
 ## Project Layout
 

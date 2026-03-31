@@ -101,7 +101,7 @@ export default function AchievementsClient() {
 
       <section className={styles.navSection}>
         <Link href="/home" className={styles.btnGhost}>Platform Home</Link>
-        <Link href="/profile" className={styles.btnGhost}>My Profile</Link>
+        <Link href="/profile" className={styles.btnGhost}>Profiles</Link>
       </section>
     </div>
   );
