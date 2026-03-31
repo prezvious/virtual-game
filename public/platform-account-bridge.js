@@ -2,15 +2,15 @@
     const FISHER_CONFIG = {
         name: 'fisher',
         label: 'Virtual Fisher',
-        url: 'https://clgzhgczlafvuagbwapk.supabase.co',
-        anonKey: 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo'
+        url: 'https://YOUR_PROJECT_REF.example.invalid',
+        anonKey: 'YOUR_SUPABASE_ANON_KEY'
     };
 
     const FARMER_CONFIG = {
         name: 'farmer',
         label: 'Virtual Farmer',
-        url: 'https://clgzhgczlafvuagbwapk.supabase.co',
-        anonKey: 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo'
+        url: 'https://YOUR_PROJECT_REF.example.invalid',
+        anonKey: 'YOUR_SUPABASE_ANON_KEY'
     };
 
     const PROJECTS = {
@@ -24,13 +24,31 @@
     };
     let sharedSessionStatePromise = null;
 
-    function usesSharedAuthBackend() {
-        return FISHER_CONFIG.url === FARMER_CONFIG.url
-            && FISHER_CONFIG.anonKey === FARMER_CONFIG.anonKey;
-    }
-
     function sanitizeText(value) {
         return String(value || '').trim();
+    }
+
+    function hasProjectConfig(config) {
+        const url = sanitizeText(config && config.url);
+        const anonKey = sanitizeText(config && config.anonKey);
+        if (!url || !anonKey) return false;
+        return !/YOUR_PROJECT_REF|YOUR_SUPABASE_ANON_KEY/i.test(`${url} ${anonKey}`);
+    }
+
+    function getConfigurationError() {
+        const missing = [];
+        if (!hasProjectConfig(FISHER_CONFIG)) missing.push(FISHER_CONFIG.label);
+        if (!hasProjectConfig(FARMER_CONFIG)) missing.push(FARMER_CONFIG.label);
+        if (!missing.length) return '';
+        return `${missing.join(' and ')} account sync is not configured for this local copy.`;
+    }
+
+    function usesSharedAuthBackend() {
+        if (!hasProjectConfig(FISHER_CONFIG) || !hasProjectConfig(FARMER_CONFIG)) {
+            return false;
+        }
+        return FISHER_CONFIG.url === FARMER_CONFIG.url
+            && FISHER_CONFIG.anonKey === FARMER_CONFIG.anonKey;
     }
 
     function ensureEmail(value) {
@@ -80,6 +98,9 @@
         if (!config) {
             throw new Error(`Unknown account project: ${name}`);
         }
+        if (!hasProjectConfig(config)) {
+            throw new Error(`${config.label} account sync is not configured for this local copy.`);
+        }
 
         const createClient = getSupabaseFactory();
         clients[key] = createClient(config.url, config.anonKey, {
@@ -110,9 +131,29 @@
 
     async function readProjectSession(name) {
         const config = getProjectConfig(name);
-        const client = getClient(name);
+        if (!config) {
+            return {
+                project: name,
+                label: name,
+                ok: false,
+                user: null,
+                session: null,
+                error: 'Unknown account project.'
+            };
+        }
+        if (!hasProjectConfig(config)) {
+            return {
+                project: name,
+                label: config.label,
+                ok: false,
+                user: null,
+                session: null,
+                error: `${config.label} account sync is not configured for this local copy.`
+            };
+        }
 
         try {
+            const client = getClient(name);
             const { data, error } = await client.auth.getSession();
             if (error) {
                 return {
@@ -358,6 +399,16 @@
     }
 
     async function signIn(input) {
+        const configurationError = getConfigurationError();
+        if (configurationError) {
+            return {
+                ok: false,
+                state: await getSessionState(),
+                error: configurationError,
+                warnings: []
+            };
+        }
+
         const payload = getAuthPayload(input || {});
         const sharedBackend = usesSharedAuthBackend();
 
@@ -443,6 +494,16 @@
     }
 
     async function signUp(input) {
+        const configurationError = getConfigurationError();
+        if (configurationError) {
+            return {
+                ok: false,
+                state: await getSessionState(),
+                error: configurationError,
+                warnings: []
+            };
+        }
+
         const payload = getAuthPayload(input || {});
         const sharedBackend = usesSharedAuthBackend();
 
@@ -536,6 +597,10 @@
     }
 
     async function signOut() {
+        if (getConfigurationError()) {
+            return getSessionState();
+        }
+
         if (usesSharedAuthBackend()) {
             const fisherClient = getClient('fisher');
             await fisherClient.auth.signOut();

@@ -273,10 +273,18 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/platform-account-bridge.js"></script>
     <script>
-        const SUPABASE_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = (() => {
+            const bridge = window.PlatformAccountBridge;
+            if (!bridge || typeof bridge.getClient !== 'function') return null;
+            try {
+                return bridge.getClient('fisher');
+            } catch (error) {
+                console.warn('Callback client unavailable:', error?.message || error);
+                return null;
+            }
+        })();
 
         const card = document.getElementById('verify-card');
         const titleText = document.getElementById('title-text');
@@ -318,6 +326,14 @@
             titleText.textContent = 'Link processed.';
             subtitleText.textContent = 'You can continue to the game and log in if needed.';
             setStatus('Token not auto-applied, but navigation is ready.');
+            goMainBtn.classList.add('ready');
+        }
+
+        function showConfigMissing() {
+            card.classList.add('success');
+            titleText.textContent = 'Account link is not configured here.';
+            subtitleText.textContent = 'This copy can still open the game in local mode.';
+            setStatus('No account token was applied for this local copy.');
             goMainBtn.classList.add('ready');
         }
 
@@ -374,6 +390,12 @@
             goMainBtn.href = getMainPageUrl();
 
             try {
+                if (!supabaseClient) {
+                    clearInterval(ticker);
+                    showConfigMissing();
+                    return;
+                }
+
                 const ok = await verifyFromUrl();
                 clearInterval(ticker);
                 setTimeout(() => ok ? showReady(true) : showFallback(), 350);

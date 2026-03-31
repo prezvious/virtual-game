@@ -6,10 +6,6 @@
 (function () {
     if (typeof CloudSystem === 'undefined') return;
 
-    const FALLBACK_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
-    const FALLBACK_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
-    const PROJECT_URL = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : FALLBACK_URL;
-    const PROJECT_KEY = typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : FALLBACK_KEY;
     const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{2,19}$/;
     const USERNAME_RESERVED = new Set([
         'admin', 'administrator', 'system', 'support', 'staff',
@@ -25,9 +21,7 @@
 
     const extensionSupabaseClient = (typeof cloudSupabaseClient !== 'undefined' && cloudSupabaseClient)
         ? cloudSupabaseClient
-        : (window.supabase && typeof window.supabase.createClient === 'function'
-            ? window.supabase.createClient(PROJECT_URL, PROJECT_KEY)
-            : null);
+        : null;
 
     CloudSystem.profile = null;
     CloudSystem.usernamePromptRequired = false;
@@ -968,4 +962,3 @@
     };
 
 })();
-

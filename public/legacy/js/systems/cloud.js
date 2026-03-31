@@ -3,8 +3,6 @@
  * Handles auth/session, cloud save, and security alert reporting.
  */
 
-const SUPABASE_URL = 'https://clgzhgczlafvuagbwapk.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_YJxmXd0uOHYMyVygm2vL6g_IsM7IVmo';
 const ALERT_FUNCTION_URL = '/api/alerts';
 
 const cloudSupabaseClient = (() => {
@@ -16,14 +14,11 @@ const cloudSupabaseClient = (() => {
             console.warn('Could not reuse bridge client:', e.message);
         }
     }
-    if (window.supabase && typeof window.supabase.createClient === 'function') {
-        return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    }
     return null;
 })();
 
 if (!cloudSupabaseClient) {
-    console.error('Supabase client library is missing. Check script order in index.html.');
+    console.warn('Cloud account sync is not configured. The game will stay in local mode.');
 }
 
 function createCloudTabId() {

@@ -1,29 +1,38 @@
-# Gaming Platform (Virtual Harvest)
+# Virtual Harvest
 
-Last updated: March 28, 2026
+Last updated: April 1, 2026
 
-This repo is the “platform shell” that ties two browser games together:
+This repo is the current web home for Virtual Harvest: a Next.js launcher site that wraps both legacy games in one shared platform. The idea is simple: land on one site, sign in once, open either world, and keep the account-facing parts of the experience in one place instead of bouncing between separate builds.
 
-- Virtual Fisher (served from `public/legacy`)
-- Virtual Farmer (served from `public/farmer-legacy`)
+The site is no longer just a thin shell around old files. It now has a real landing page, a proper account home, dedicated launcher routes for both games, player profile pages, social pages, achievements, a live leaderboard, and an admin surface for platform management.
 
-The vibe: sign in once, land on a single home hub, then jump between fishing and farming without hopping sites. On top of that, the platform adds a layer of social + progression stuff around the games (profile, friends, achievements, shop, chat, and a public leaderboard).
+## What Changed In This Version
 
-## What’s In The Platform
+- The landing page at `/` is now the front door for the whole project instead of a placeholder.
+- `/home` works like the main account center. It shows account status, linked game state, and launch points for Fisher and Farmer.
+- `/fish` and `/farm` are the main play routes now. The older `/play` and `/farmer` paths stick around as redirects so old links do not feel broken.
+- Profiles are shared across the platform. Players get one username, one profile note, one account page, and a public profile route at `/profile/[username]`.
+- Social features are split into their own page at `/friends`, with views for friends, followers, following, and blocked users.
+- `/leaderboard` is a standalone page with live refreshing boards instead of a tucked-away extra.
+- `/achievements` now has its own filtered tracker with unlock counts and XP totals.
+- There is also an `/admin` dashboard for moderation and support work.
 
-- **Landing page** (`/`) that introduces the platform and links to the hub.
-- **Account home / launcher** (`/home`) where you log in, see link status for both games, and launch either world.
-- **Game shell routes** that embed the legacy runtimes:
-  - `/fish` loads `/legacy/index.html`
-  - `/farm` loads `/farmer-legacy/game.html`
-- **Community features**:
-  - `/leaderboard` for the public leaderboard
-  - `/chat` for the global chat (history is intentionally short; recent messages only)
-  - `/friends`, `/profile`, `/profile/[username]`, `/search`
-  - `/achievements`
-- **Shop** (`/shop`) for spending coins on gear and upgrades.
+## Main Routes
 
-## Quick Start (Local Dev)
+- `/` - landing page
+- `/home` - account hub and launcher
+- `/fish` - Virtual Fisher in the embedded runtime shell
+- `/farm` - Virtual Farmer in the embedded runtime shell
+- `/leaderboard` - live leaderboard page
+- `/friends` - social connections page
+- `/profile` - your own account profile
+- `/profile/[username]` - public player profile
+- `/achievements` - achievements tracker
+- `/admin` - admin dashboard
+- `/play` - redirect to `/fish`
+- `/farmer` - redirect to `/farm`
+
+## Local Dev
 
 ```bash
 npm install
@@ -32,7 +41,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Other useful scripts:
+Useful scripts:
 
 ```bash
 npm run build
@@ -42,52 +51,62 @@ npm run lint
 
 ## Using It Offline
 
-There are two “offline” levels depending on what you want.
+There are two practical offline setups.
 
-1. **Offline for gameplay (recommended):** run the app locally and just use the legacy games.
-   - Start the dev server (`npm run dev`) or a production server (`npm run build` then `npm run start`).
-   - Visit `/fish` or `/farm`.
-   - The platform pages will still load, but features that rely on server data (sign-in, profiles, leaderboards, chat, shop, admin) may be limited or show “signed out / unavailable” messages if you haven’t configured backend credentials.
+### 1. Run the full site locally
 
-2. **Offline as pure static HTML:** serve the legacy builds directly.
-   - Start a simple static server pointed at `public/` (pick one):
-     - `npx serve public -l 3000`
-     - `python -m http.server 3000 --directory public`
-   - Open:
-     - `http://localhost:3000/legacy/index.html`
-     - `http://localhost:3000/farmer-legacy/game.html`
+This is the best option if you want the actual website shell, route structure, and launcher flow.
 
-Tip: opening the HTML files via `file://` can break things like workers, audio loading, or fetches in some browsers. A local server is the safest “offline” setup.
+```bash
+npm install
+npm run dev
+```
 
-## Main Routes
+Then open `http://localhost:3000`.
 
-| Route | What it’s for |
-|---|---|
-| `/` | Landing page |
-| `/home` | Account home + launcher |
-| `/fish` | Launch Virtual Fisher |
-| `/farm` | Launch Virtual Farmer |
-| `/leaderboard` | Public leaderboard |
-| `/chat` | Global chat |
-| `/friends` | Friends/following UI |
-| `/profile` | Your profile |
-| `/profile/[username]` | Public profile page |
-| `/search` | Player + content search |
-| `/shop` | Item shop |
-| `/achievements` | Achievements UI |
-| `/admin` | Admin panel (intended for internal use) |
+What still works well in this mode:
 
-## Folder Guide
+- the landing page
+- the account home layout
+- the embedded Fisher and Farmer routes
+- the legacy game files themselves
 
-- `src/app`: Next.js routes (pages + API routes)
-- `src/components`: UI and client components (hub, game shell, chat, onboarding, etc.)
-- `src/lib`: shared helpers/models
-- `public/legacy`: Virtual Fisher static runtime
-- `public/farmer-legacy`: Virtual Farmer static runtime
-- `virtual-farmer`: standalone/dev copy of the farmer runtime sources
-- `virtual-fisher`: standalone/dev copy of the fisher runtime sources
+What may stay unavailable unless you add your own local account-sync setup:
+
+- sign-in and account linking
+- public profile data
+- friends and follow actions
+- live leaderboard updates
+- achievement sync
+- admin actions
+
+### 2. Serve the legacy games directly
+
+If you only want the original game runtimes without the Next.js shell around them, serve `public/` as static files:
+
+```bash
+npx serve public -l 3000
+```
+
+Then open:
+
+- `http://localhost:3000/legacy/index.html`
+- `http://localhost:3000/farmer-legacy/game.html`
+
+Avoid opening the HTML files with `file://`. A small local server is the safer option because workers, fetch calls, and a few browser APIs are much less fragile there.
+
+## Project Layout
+
+- `src/app` - Next.js routes and route-level styling
+- `src/components` - account, profile, leaderboard, admin, onboarding, and game shell UI
+- `src/lib` - shared client and server helpers
+- `public/legacy` - shipped Virtual Fisher runtime
+- `public/farmer-legacy` - shipped Virtual Farmer runtime
+- `virtual-fisher` - working source copy for Fisher
+- `virtual-farmer` - working source copy for Farmer
 
 ## Notes
 
-- This is intentionally a hybrid: modern platform UI plus legacy game runtimes embedded in a shell.
-- There isn’t a full automated test suite at the root yet, so changes are typically validated by running the app locally and clicking through the main flows.
+- This repo intentionally keeps the legacy game runtimes alongside the newer Next.js shell.
+- The website is easiest to verify by running it locally and clicking through the main routes.
+- `npm run lint` is the main lightweight validation command available at the root right now.

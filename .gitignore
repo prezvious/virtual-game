@@ -25,6 +25,10 @@
 *.log
 secrets/
 **/secrets/
+/supabase/
+supabase/
+/output/
+output/
 
 # local tooling (not for public repos)
 .claude/
