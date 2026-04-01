@@ -1,15 +1,23 @@
 import { createClient } from "@supabase/supabase-js";
 
-const DEFAULT_SUPABASE_URL = "https://your-project-ref.example.invalid";
-const DEFAULT_SUPABASE_ANON_KEY = "YOUR_PUBLIC_ANON_KEY";
-
 export function getSupabaseConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || DEFAULT_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Missing required Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    );
+  }
+
   return { url, anonKey };
 }
 
-export function createServerSupabaseClient() {
+export function stripBearer(authHeader: string): string {
+  return authHeader.replace(/^Bearer\s+/i, "").trim();
+}
+
+export function createAnonServerClient() {
   const { url, anonKey } = getSupabaseConfig();
   return createClient(url, anonKey, {
     auth: {

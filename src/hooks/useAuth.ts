@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
-import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { getClientSupabase } from "@/lib/auth-client";
 
 type AuthState = {
   user: User | null;
@@ -14,7 +14,7 @@ export function useAuth() {
   const [state, setState] = useState<AuthState>({ user: null, session: null, loading: true });
 
   useEffect(() => {
-    const supabase = getSupabaseBrowser();
+    const supabase = getClientSupabase();
     let mounted = true;
 
     supabase.auth.getSession().then(({ data }) => {
@@ -34,7 +34,7 @@ export function useAuth() {
   }, []);
 
   const signOut = useCallback(async () => {
-    const supabase = getSupabaseBrowser();
+    const supabase = getClientSupabase();
     await supabase.auth.signOut();
   }, []);
 

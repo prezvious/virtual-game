@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "game must be 'fisher' or 'farmer'." }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from("platform_settings")
     .select("value, updated_at")

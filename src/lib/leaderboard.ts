@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServiceSupabaseClient } from "@/lib/supabase";
 
 export type LeaderboardEntry = {
   rank: number;
@@ -34,7 +34,7 @@ function formatScore(value: unknown): string {
 }
 
 export async function fetchLeaderboardModel(limit = 10): Promise<LeaderboardModel> {
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("leaderboard_snapshots")
     .select("metric, rank, username, score, refreshed_at")

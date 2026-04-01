@@ -54,6 +54,8 @@ function extractLegacyPayload(html: string) {
 }
 
 async function loadLegacyScriptsInOrder(scripts: LegacyScript[]) {
+  const injectedScripts: HTMLScriptElement[] = [];
+
   for (const item of scripts) {
     const src = item.src?.trim() || "";
 
@@ -71,6 +73,7 @@ async function loadLegacyScriptsInOrder(scripts: LegacyScript[]) {
         scriptTag.onload = () => resolve();
         scriptTag.onerror = () => reject(new Error(`Failed to load legacy script: ${scriptUrl}`));
         document.body.appendChild(scriptTag);
+        injectedScripts.push(scriptTag);
       });
       continue;
     }
@@ -81,7 +84,12 @@ async function loadLegacyScriptsInOrder(scripts: LegacyScript[]) {
     const inlineScript = document.createElement("script");
     inlineScript.text = inlineCode;
     document.body.appendChild(inlineScript);
+    injectedScripts.push(inlineScript);
   }
+
+  return () => {
+    injectedScripts.forEach((s) => s.remove());
+  };
 }
 
 export default function LegacyGameClient() {
@@ -90,6 +98,7 @@ export default function LegacyGameClient() {
 
   useEffect(() => {
     let cancelled = false;
+    let cleanupScripts: (() => void) | null = null;
 
     const bootstrap = async () => {
       try {
@@ -114,7 +123,7 @@ export default function LegacyGameClient() {
         host.innerHTML = shellHtml;
 
         setStatus("Booting game runtime...");
-        await loadLegacyScriptsInOrder(scripts);
+        cleanupScripts = await loadLegacyScriptsInOrder(scripts);
         if (cancelled) return;
 
         window.__legacyLoaderDone = true;
@@ -128,6 +137,8 @@ export default function LegacyGameClient() {
     void bootstrap();
     return () => {
       cancelled = true;
+      window.__legacyLoaderDone = false;
+      cleanupScripts?.();
     };
   }, []);
 

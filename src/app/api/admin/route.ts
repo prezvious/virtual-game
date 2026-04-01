@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 function forbidden() {
@@ -8,16 +8,14 @@ function forbidden() {
 
 async function verifyAdmin(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
-  if (!authHeader) { console.error("[admin] No authorization header"); return null; }
+  if (!authHeader) return null;
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_FUNCTIONS_KEY || "";
-  if (!serviceKey) { console.error("[admin] SUPABASE_SERVICE_ROLE_KEY is not set"); return null; }
+  if (!serviceKey) return null;
 
-  const anonClient = createServerSupabaseClient();
-  const { data: { user }, error: userError } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
-  if (userError) { console.error("[admin] getUser error:", userError.message); return null; }
-  if (!user) { console.error("[admin] No user from token"); return null; }
-  console.log("[admin] User verified:", user.id);
+  const anonClient = createAnonServerClient();
+  const { data: { user }, error: userError } = await anonClient.auth.getUser(stripBearer(authHeader));
+  if (userError || !user) return null;
 
   const supabase = createServiceSupabaseClient();
   const { data: profile, error: profileError } = await supabase
@@ -26,8 +24,7 @@ async function verifyAdmin(req: NextRequest) {
     .eq("user_id", user.id)
     .single();
 
-  if (profileError) { console.error("[admin] Profile query error:", profileError.message); return null; }
-  if (!profile?.is_admin) { console.error("[admin] User not admin. is_admin =", profile?.is_admin); return null; }
+  if (profileError || !profile?.is_admin) return null;
   return { user, supabase };
 }
 
@@ -137,23 +134,32 @@ export async function POST(req: NextRequest) {
 
   if (action === "spawn_item") {
     const itemId = String(body.item_id || "");
-    const quantity = Math.max(1, Number(body.quantity) || 1);
+    const quantity = Math.min(Math.max(1, Number(body.quantity) || 1), 9999);
 
     if (!targetId || !itemId) {
       return NextResponse.json({ ok: false, error: "target_user_id and item_id required." }, { status: 400 });
     }
 
-    const { data: existing } = await supabase
+    const { data: existing, error: readError } = await supabase
       .from("user_inventory")
       .select("quantity")
       .eq("user_id", targetId)
       .eq("item_id", itemId)
       .maybeSingle();
 
-    if (existing) {
-      await supabase.from("user_inventory").update({ quantity: existing.quantity + quantity }).eq("user_id", targetId).eq("item_id", itemId);
-    } else {
-      await supabase.from("user_inventory").insert({ user_id: targetId, item_id: itemId, quantity });
+    if (readError) {
+      return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+    }
+
+    const { error: writeError } = await supabase
+      .from("user_inventory")
+      .upsert(
+        { user_id: targetId, item_id: itemId, quantity: existing ? existing.quantity + quantity : quantity },
+        { onConflict: "user_id,item_id" }
+      );
+
+    if (writeError) {
+      return NextResponse.json({ ok: false, error: writeError.message }, { status: 500 });
     }
 
     await logAction({ item_id: itemId, quantity });
@@ -162,7 +168,7 @@ export async function POST(req: NextRequest) {
 
   if (action === "set_weather") {
     const condition = String(body.condition || "clear");
-    const intensity = Number(body.intensity) || 1;
+    const intensity = Math.min(Math.max(1, Number(body.intensity) || 1), 100);
     const game = String(body.game || "").toLowerCase();
 
     if (game !== "fisher" && game !== "farmer") {
@@ -173,22 +179,15 @@ export async function POST(req: NextRequest) {
     const weatherValue = { condition, intensity };
     const now = new Date().toISOString();
 
-    // Upsert: insert if key doesn't exist, update if it does
-    const { error: existsError } = await supabase
+    const { error: writeError } = await supabase
       .from("platform_settings")
-      .select("key")
-      .eq("key", settingsKey)
-      .single();
+      .upsert(
+        { key: settingsKey, value: weatherValue, updated_by: adminUser.id, updated_at: now },
+        { onConflict: "key" }
+      );
 
-    if (existsError) {
-      await supabase
-        .from("platform_settings")
-        .insert({ key: settingsKey, value: weatherValue, updated_by: adminUser.id, updated_at: now });
-    } else {
-      await supabase
-        .from("platform_settings")
-        .update({ value: weatherValue, updated_by: adminUser.id, updated_at: now })
-        .eq("key", settingsKey);
+    if (writeError) {
+      return NextResponse.json({ ok: false, error: writeError.message }, { status: 500 });
     }
 
     await logAction({ game, condition, intensity });
@@ -201,15 +200,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "target_user_id and amount required." }, { status: 400 });
     }
 
-    const { data: balance } = await supabase.from("user_balances").select("coins").eq("user_id", targetId).single();
+    const { data: balance, error: readError } = await supabase
+      .from("user_balances")
+      .select("coins")
+      .eq("user_id", targetId)
+      .single();
+
+    if (readError && readError.code !== "PGRST116") {
+      return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+    }
+
     const current = balance?.coins || 0;
     const newAmount = action === "add_money" ? current + amount : Math.max(0, current - amount);
 
-    const { data: existing } = await supabase.from("user_balances").select("user_id").eq("user_id", targetId).maybeSingle();
-    if (existing) {
-      await supabase.from("user_balances").update({ coins: newAmount }).eq("user_id", targetId);
-    } else {
-      await supabase.from("user_balances").insert({ user_id: targetId, coins: newAmount });
+    const { error: writeError } = await supabase
+      .from("user_balances")
+      .upsert({ user_id: targetId, coins: newAmount }, { onConflict: "user_id" });
+
+    if (writeError) {
+      return NextResponse.json({ ok: false, error: writeError.message }, { status: 500 });
     }
 
     await logAction({ previous: current, new_amount: newAmount, change: action === "add_money" ? amount : -amount });
@@ -221,7 +230,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "target_user_id required." }, { status: 400 });
     }
 
-    await supabase.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
+    if (targetId === adminUser.id) {
+      return NextResponse.json({ ok: false, error: "Cannot ban yourself." }, { status: 400 });
+    }
+
+    const { data: targetProfile } = await supabase
+      .from("user_profiles")
+      .select("is_admin")
+      .eq("user_id", targetId)
+      .maybeSingle();
+
+    if (targetProfile?.is_admin) {
+      return NextResponse.json({ ok: false, error: "Cannot ban another admin." }, { status: 403 });
+    }
+
+    const { error: banError } = await supabase.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
+    if (banError) {
+      await logAction({ reason: String(body.reason || "Admin action"), error: banError.message });
+      return NextResponse.json({ ok: false, error: banError.message }, { status: 500 });
+    }
+
     await logAction({ reason: String(body.reason || "Admin action") });
     return NextResponse.json({ ok: true, message: "User banned." });
   }
@@ -231,12 +259,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "target_user_id required." }, { status: 400 });
     }
 
-    await supabase.from("game_saves").delete().eq("user_id", targetId);
-    await supabase.from("user_inventory").delete().eq("user_id", targetId);
-    await supabase.from("user_balances").delete().eq("user_id", targetId);
-    await supabase.from("user_achievements").delete().eq("user_id", targetId);
-    await supabase.from("messages").delete().eq("sender_id", targetId);
-    await supabase.from("follows").delete().or(`follower_id.eq.${targetId},following_id.eq.${targetId}`);
+    if (targetId === adminUser.id) {
+      return NextResponse.json({ ok: false, error: "Cannot delete yourself." }, { status: 400 });
+    }
+
+    const { data: targetProfile } = await supabase
+      .from("user_profiles")
+      .select("is_admin")
+      .eq("user_id", targetId)
+      .maybeSingle();
+
+    if (targetProfile?.is_admin) {
+      return NextResponse.json({ ok: false, error: "Cannot delete another admin." }, { status: 403 });
+    }
+
+    const errors: string[] = [];
+
+    const deleteOps = [
+      { table: "game_saves", query: supabase.from("game_saves").delete().eq("user_id", targetId) },
+      { table: "user_inventory", query: supabase.from("user_inventory").delete().eq("user_id", targetId) },
+      { table: "user_balances", query: supabase.from("user_balances").delete().eq("user_id", targetId) },
+      { table: "user_achievements", query: supabase.from("user_achievements").delete().eq("user_id", targetId) },
+      { table: "user_game_stats", query: supabase.from("user_game_stats").delete().eq("user_id", targetId) },
+      { table: "messages", query: supabase.from("messages").delete().eq("sender_id", targetId) },
+      { table: "follows", query: supabase.from("follows").delete().or(`follower_id.eq.${targetId},following_id.eq.${targetId}`) },
+      { table: "blocks", query: supabase.from("blocks").delete().or(`blocker_id.eq.${targetId},blocked_id.eq.${targetId}`) },
+      { table: "user_profiles", query: supabase.from("user_profiles").delete().eq("user_id", targetId) },
+    ];
+
+    for (const op of deleteOps) {
+      const { error } = await op.query;
+      if (error) errors.push(`${op.table}: ${error.message}`);
+    }
+
+    if (errors.length > 0) {
+      await logAction({ reason: String(body.reason || "Admin action"), errors });
+      return NextResponse.json({ ok: false, error: "Partial deletion.", errors }, { status: 500 });
+    }
 
     await logAction({ reason: String(body.reason || "Admin action") });
     return NextResponse.json({ ok: true, message: "User data deleted." });

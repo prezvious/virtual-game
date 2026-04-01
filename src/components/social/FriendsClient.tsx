@@ -20,19 +20,32 @@ export default function FriendsClient() {
   const [tab, setTab] = useState<Tab>("friends");
   const [data, setData] = useState<SocialUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
   const fetchData = useCallback(async (activeTab: Tab) => {
     setLoading(true);
+    setError(null);
     try {
       const supabase = getClientSupabase();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        setError("Sign in to view your connections.");
+        setLoading(false);
+        return;
+      }
       const res = await fetch(`/api/social?tab=${activeTab}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (!res.ok) {
+        setError(`Failed to load data (${res.status}).`);
+        return;
+      }
       const json = await res.json();
       if (json.ok) setData(json.data || []);
+      else setError(json.error || "Failed to load data.");
+    } catch {
+      setError("Network error. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -42,16 +55,24 @@ export default function FriendsClient() {
 
   const doAction = useCallback(async (action: string, targetId: string) => {
     setActionBusy(true);
+    setError(null);
     try {
       const supabase = getClientSupabase();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      await fetch("/api/social", {
+      const res = await fetch("/api/social", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ action, target_id: targetId }),
       });
+      const json = await res.json();
+      if (!json.ok) {
+        setError(json.error || "Action failed.");
+        return;
+      }
       await fetchData(tab);
+    } catch {
+      setError("Network error. Check your connection.");
     } finally {
       setActionBusy(false);
     }
@@ -85,6 +106,15 @@ export default function FriendsClient() {
       <section className={styles.list}>
         {loading ? (
           <p className={styles.emptyMsg}>Loading...</p>
+        ) : error ? (
+          <p className={styles.emptyMsg}>
+            {error}
+            {(error.includes("Network") || error.includes("Failed to load") || error.includes("Sign in")) && (
+              <button onClick={() => void fetchData(tab)} className={styles.btnSmall} style={{ marginLeft: "0.5rem" }}>
+                Retry
+              </button>
+            )}
+          </p>
         ) : data.length === 0 ? (
           <p className={styles.emptyMsg}>
             {tab === "friends" && "No friends yet. Follow users and wait for them to follow back!"}
@@ -93,11 +123,11 @@ export default function FriendsClient() {
             {tab === "blocked" && "No blocked users."}
           </p>
         ) : (
-          data.map((item) => {
+          data.map((item, index) => {
             const userId = getUserId(item);
             const uname = getUsername(item);
             return (
-              <div key={userId} className={styles.row}>
+              <div key={`${tab}-${userId}-${index}`} className={styles.row}>
                 <Link href={`/profile/${uname}`} className={styles.userLink}>
                   <span className={styles.userAvatar}>{uname.charAt(0).toUpperCase()}</span>
                   <span className={styles.userName}>@{uname}</span>

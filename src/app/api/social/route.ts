@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 function unauthorized() {
@@ -9,8 +9,9 @@ function unauthorized() {
 async function getAuthUser(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader) return null;
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  const supabase = createAnonServerClient();
+  const { data: { user }, error } = await supabase.auth.getUser(stripBearer(authHeader));
+  if (error || !user) return null;
   return user;
 }
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return unauthorized();
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceSupabaseClient();
   const tab = req.nextUrl.searchParams.get("tab") || "followers";
   const targetId = req.nextUrl.searchParams.get("user_id") || user.id;
 
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid target." }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceSupabaseClient();
 
   if (action === "follow") {
     const { error } = await supabase.from("follows").upsert({ follower_id: user.id, following_id: targetId });

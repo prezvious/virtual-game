@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient, createServiceSupabaseClient } from "@/lib/supabase";
 
 const TRACKING_STARTED_ON = "2026-04-01";
 
@@ -46,7 +46,7 @@ async function authenticateRequest(req: NextRequest) {
     return { user: null, response: NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 }) };
   }
 
-  const anonClient = createServerSupabaseClient();
+  const anonClient = createAnonServerClient();
   const { data: { user }, error } = await anonClient.auth.getUser(token);
   if (error || !user) {
     return { user: null, response: NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 }) };

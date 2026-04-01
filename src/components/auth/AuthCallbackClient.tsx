@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getSupabaseConfig } from "@/lib/supabase";
+import { getClientSupabase } from "@/lib/auth-client";
 
 type ExchangeResponse = {
   ok: boolean;
@@ -14,11 +13,6 @@ type ExchangeResponse = {
     refresh_token: string;
   };
 };
-
-function createBrowserSupabaseClient() {
-  const { url, anonKey } = getSupabaseConfig();
-  return createClient(url, anonKey);
-}
 
 async function exchangeViaServer(body: Record<string, string>): Promise<ExchangeResponse> {
   const response = await fetch("/api/auth/exchange", {
@@ -40,7 +34,7 @@ export default function AuthCallbackClient() {
   const [status, setStatus] = useState("Checking verification token...");
   const [ready, setReady] = useState(false);
   const [success, setSuccess] = useState(false);
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = useMemo(() => getClientSupabase(), []);
 
   useEffect(() => {
     let mounted = true;

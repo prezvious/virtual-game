@@ -33,25 +33,40 @@ const CATEGORIES = ["all", "fishing", "exploration", "dedication", "social", "ec
 export default function AchievementsClient() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const supabase = getClientSupabase();
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id || "";
-        const res = await fetch(`/api/achievements?user_id=${userId}`);
-        const json = await res.json();
-        if (json.ok) setAchievements(json.achievements);
-      } finally {
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = getClientSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || "";
+      if (!userId) {
+        setError("Sign in to view achievements.");
         setLoading(false);
+        return;
       }
-    };
+      const res = await fetch(`/api/achievements?user_id=${userId}`);
+      if (!res.ok) {
+        setError(`Failed to load achievements (${res.status}).`);
+        return;
+      }
+      const json = await res.json();
+      if (json.ok) {
+        setAchievements(json.achievements);
+      } else {
+        setError(json.error || "Failed to load achievements.");
+      }
+    } catch {
+      setError("Network error. Check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
   const filtered = filter === "all" ? achievements : achievements.filter((achievement) => achievement.category === filter);
   const unlockedCount = achievements.filter((achievement) => achievement.unlocked).length;
@@ -90,6 +105,13 @@ export default function AchievementsClient() {
       <section className={styles.grid}>
         {loading ? (
           <p className={styles.emptyMsg}>Loading achievements...</p>
+        ) : error ? (
+          <div className={styles.emptyMsg}>
+            <p>{error}</p>
+            <button onClick={() => void load()} className={styles.filterBtn} style={{ marginTop: "0.5rem" }}>
+              Retry
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <p className={styles.emptyMsg}>No achievements in this category.</p>
         ) : (

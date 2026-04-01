@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
-  const supabase = createServerSupabaseClient();
+  const supabase = createAnonServerClient();
   const userId = req.nextUrl.searchParams.get("user_id");
 
   const { data: allAchievements, error } = await supabase

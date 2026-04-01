@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const AUTH_EXCHANGE_RATE_LIMIT = 20;
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     return badRequest("Provide either `code` or (`token_hash` and `type`).");
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createAnonServerClient();
 
   try {
     if (code) {

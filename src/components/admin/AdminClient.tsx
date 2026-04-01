@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getClientSupabase } from "@/lib/auth-client";
 import styles from "@/app/admin/admin.module.css";
@@ -22,6 +22,7 @@ export default function AdminClient() {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [tabError, setTabError] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   // Action form state
   const [actionType, setActionType] = useState("spawn_item");
@@ -53,6 +54,10 @@ export default function AdminClient() {
   }, []);
 
   const fetchTab = useCallback(async (t: Tab) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setTabError("");
     const token = await getToken();
     if (!token) {
@@ -61,28 +66,39 @@ export default function AdminClient() {
     }
     try {
       if (t === "users") {
-        const res = await fetch(`/api/admin?tab=users&q=${encodeURIComponent(searchQ)}`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`/api/admin?tab=users&q=${encodeURIComponent(searchQ)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
         const json = await res.json();
         if (json.ok) setUsers(json.users);
         else setTabError(json.error || "Failed to load users.");
       } else if (t === "logs") {
-        const res = await fetch("/api/admin?tab=logs", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/admin?tab=logs", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
         const json = await res.json();
         if (json.ok) setLogs(json.logs);
         else setTabError(json.error || "Failed to load logs.");
       } else if (t === "settings") {
-        const res = await fetch("/api/admin?tab=settings", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/admin?tab=settings", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
         const json = await res.json();
         if (json.ok) setSettings(json.settings);
         else setTabError(json.error || "Failed to load settings.");
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setTabError(err instanceof Error ? err.message : "Network error. Check your connection.");
     }
   }, [getToken, searchQ]);
 
   useEffect(() => {
     if (isAdmin) void fetchTab(tab);
+    return () => { abortRef.current?.abort(); };
   }, [tab, isAdmin, fetchTab]);
 
   const executeAction = useCallback(async () => {
