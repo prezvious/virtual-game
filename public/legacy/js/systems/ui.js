@@ -676,7 +676,94 @@ class UI {
         const el = document.getElementById('status-message');
         if (!el) return;
 
-        el.textContent = msg;
+        el.textContent = String(msg ?? '');
+        this._applyStatusTone(el, type);
+    }
+
+    updateStatusRich(parts, type = 'normal') {
+        const el = document.getElementById('status-message');
+        if (!el) return;
+
+        el.replaceChildren(this._renderInlineParts(parts));
+        this._applyStatusTone(el, type);
+    }
+
+    updateStatusWithFish(message, fishName, type = 'normal') {
+        const text = String(message ?? '');
+        const target = String(fishName || '').trim();
+        if (!target) {
+            this.updateStatus(text, type);
+            return;
+        }
+
+        const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const matcher = new RegExp(escaped, 'g');
+        const parts = [];
+        let cursor = 0;
+        let didHighlight = false;
+        let match = matcher.exec(text);
+
+        while (match) {
+            if (match.index > cursor) {
+                parts.push({ text: text.slice(cursor, match.index) });
+            }
+
+            parts.push({
+                text: match[0],
+                className: 'fish-name-token fish-name-status'
+            });
+            didHighlight = true;
+            cursor = matcher.lastIndex;
+            match = matcher.exec(text);
+        }
+
+        if (!didHighlight) {
+            this.updateStatus(text, type);
+            return;
+        }
+
+        if (cursor < text.length) {
+            parts.push({ text: text.slice(cursor) });
+        }
+
+        this.updateStatusRich(parts, type);
+    }
+
+    _renderInlineParts(parts) {
+        const fragment = document.createDocumentFragment();
+        if (!Array.isArray(parts)) {
+            return fragment;
+        }
+
+        parts.forEach((part) => {
+            if (part === null || part === undefined) return;
+
+            const descriptor = typeof part === 'string'
+                ? { text: part }
+                : part;
+            const text = String(descriptor.text ?? '');
+            if (!text) return;
+
+            if (!descriptor.className && !descriptor.color) {
+                fragment.appendChild(document.createTextNode(text));
+                return;
+            }
+
+            const span = document.createElement('span');
+            span.textContent = text;
+            if (descriptor.className) {
+                span.className = descriptor.className;
+            }
+            if (descriptor.color) {
+                span.style.color = descriptor.color;
+            }
+            fragment.appendChild(span);
+        });
+
+        return fragment;
+    }
+
+    _applyStatusTone(el, type = 'normal') {
         el.style.color = type === 'danger'
             ? 'var(--danger)'
             : type === 'success'
@@ -690,7 +777,10 @@ class UI {
         const el = document.getElementById('last-catch');
         if (!el) return;
 
-        let label = `Last Catch: <span style="color:${RARITY[fish.rarity].color}">${fish.name}</span> (${fish.weight}kg)`;
+        const rarityColor = RARITY[fish.rarity]?.color || 'var(--theme-success-text)';
+        const parts = [
+            { text: 'Last Catch: ' }
+        ];
 
         if (fish.variant) {
             const varColor = fish.variant.label === 'Prismatic'
@@ -698,10 +788,22 @@ class UI {
                 : fish.variant.label === 'Shadow'
                     ? '#6366f1'
                     : '#facc15';
-            label = `Last Catch: <span style="color:${varColor}">${fish.variant.icon} ${fish.variant.label}</span> <span style="color:${RARITY[fish.rarity].color}">${fish.name}</span> (${fish.weight}kg)`;
+            parts.push({
+                text: `${fish.variant.icon} ${fish.variant.label}`,
+                className: 'fish-variant-token',
+                color: varColor
+            });
+            parts.push({ text: ' ' });
         }
 
-        el.innerHTML = label;
+        parts.push({
+            text: fish.name,
+            className: 'fish-name-token fish-name-last-catch',
+            color: rarityColor
+        });
+        parts.push({ text: ` (${fish.weight}kg)` });
+
+        el.replaceChildren(this._renderInlineParts(parts));
     }
 
     showMinigame(show) {

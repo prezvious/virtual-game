@@ -2387,7 +2387,7 @@
 
             // Update UI
             this.ui.showMinigame(true);
-            this.ui.updateStatus(this._buildReelingStatus(fishData));
+            this._setFishStatus(this._buildReelingStatus(fishData), fishData);
             document.getElementById('action-btn').textContent = "REEL NOW!";
             document.getElementById('action-btn').classList.add('reeling');
 
@@ -2441,7 +2441,7 @@
                         ? `${effectiveCapacity.toFixed(1)}kg effective`
                         : `${rod.capacity}kg max`;
                     this.log(`Released: ${fish.name} (${fish.weight}kg) was too heavy for your ${rod.name} (${capacityText}).`);
-                    this.ui.updateStatus(`${fish.name} broke free. Too heavy.`, "danger");
+                    this._setFishStatus(`${fish.name} broke free. Too heavy.`, fish, "danger");
                     this.ui.floatText("TOO HEAVY!");
                     this.achievementManager.onWeightFail(fish);
                     this._recordMeasuredRodOutcome('escape', fish, 'manual');
@@ -2503,12 +2503,11 @@
             logMsg += ` | +${fish.value} coins value`;
             this.log(logMsg);
 
-            let statusMsg = `Caught ${fish.name}.`;
-            if (fish.variant) statusMsg = `${fish.variant.icon} ${fish.variant.label} ${fish.name}.`;
-            if (isCrit) statusMsg += ` ${this._lastCriticalStatus?.text || 'CRITICAL!'}`;
-            if (storeOutcome.action === 'sold') statusMsg += ' Inventory full: catch auto-sold.';
-            if (storeOutcome.action === 'rejected') statusMsg += ` Inventory full (${MAX_INVENTORY_FISH}).`;
-            this.ui.updateStatus(statusMsg, 'success');
+            this._updateCatchStatus(fish, {
+                mode: 'manual',
+                isCrit,
+                storeOutcome
+            });
             this.ui.updateLastCatch(fish);
             this._recordMeasuredRodOutcome('catch', fish, 'manual');
             this.ui.renderStats();
@@ -2538,7 +2537,7 @@
                     ? `${rescuedFish._rodRescuedBy} softened the line. ${fish.name} slips in as ${rescueRarity}.`
                     : `${rescuedFish._rodRescuedBy} held the line. ${fish.name} stays with you.`;
                 this.log(rescueMsg);
-                this.ui.updateStatus(rescueMsg, 'success');
+                this._setFishStatus(rescueMsg, fish, 'success');
                 this.ui.floatTextStyled((rescuedFish._rodRescuedBy || 'Held').toUpperCase(), fish?._rodCastEffect?.color || '#f59e0b');
                 this._catchAuthorized = true;
                 this.catchSuccess(rescuedFish);
@@ -2560,7 +2559,7 @@
             }
 
             this.log(msg);
-            this.ui.updateStatus(msg, statusType);
+            this._setFishStatus(msg, fish, statusType);
             this._recordMeasuredRodOutcome('escape', fish, 'manual');
             this.breakCombo();
             this.setFishingMode('idle');
@@ -2596,6 +2595,64 @@
 
             this._lastGeneratedMessageByKey[key] = index;
             return messages[index];
+        }
+
+        _setFishStatus(message, fishOrName, type = 'normal') {
+            const fishName = typeof fishOrName === 'string'
+                ? fishOrName
+                : String(fishOrName?.name || '');
+
+            if (fishName && typeof this.ui.updateStatusWithFish === 'function') {
+                this.ui.updateStatusWithFish(message, fishName, type);
+                return;
+            }
+
+            this.ui.updateStatus(message, type);
+        }
+
+        _updateCatchStatus(fish, { mode = 'manual', isCrit = false, storeOutcome = null } = {}) {
+            const prefix = mode === 'auto' ? 'Auto caught ' : 'Caught ';
+            let fallback = `${prefix}${fish.name}.`;
+
+            const parts = [{ text: prefix }];
+            if (fish.variant) {
+                const variantText = `${fish.variant.icon} ${fish.variant.label}`;
+                parts.push({
+                    text: variantText,
+                    className: 'fish-variant-token fish-variant-status'
+                });
+                parts.push({ text: ' ' });
+                fallback = `${prefix}${variantText} ${fish.name}.`;
+            }
+
+            parts.push({
+                text: fish.name,
+                className: 'fish-name-token fish-name-status'
+            });
+            parts.push({ text: '.' });
+
+            if (isCrit) {
+                const critText = this._lastCriticalStatus?.text || 'CRITICAL!';
+                parts.push({ text: ` ${critText}` });
+                fallback += ` ${critText}`;
+            }
+
+            if (storeOutcome?.action === 'sold') {
+                const soldText = ' Inventory full: catch auto-sold.';
+                parts.push({ text: soldText });
+                fallback += soldText;
+            } else if (storeOutcome?.action === 'rejected') {
+                const rejectedText = ` Inventory full (${MAX_INVENTORY_FISH}).`;
+                parts.push({ text: rejectedText });
+                fallback += rejectedText;
+            }
+
+            if (typeof this.ui.updateStatusRich === 'function') {
+                this.ui.updateStatusRich(parts, 'success');
+                return;
+            }
+
+            this._setFishStatus(fallback, fish, 'success');
         }
 
         _buildReelingStatus(fish) {
@@ -2861,7 +2918,7 @@
 
             const fish = this.minigame.fishOnLine;
             this.autoFish.phase = 'reeling';
-            this.ui.updateStatus(this._buildReelingStatus(fish));
+            this._setFishStatus(this._buildReelingStatus(fish), fish);
             document.getElementById('action-btn').textContent = 'Reeling...';
 
             // Phase 3: Reel Time (0.5 seconds - faster than manual)
@@ -2886,7 +2943,7 @@
                         ? `${effectiveCapacity.toFixed(1)}kg effective`
                         : `${rod.capacity}kg max`;
                     this.log(`Released: ${fish.name} (${fish.weight}kg) was too heavy for ${rod.name} (${capacityText}).`);
-                    this.ui.updateStatus(`${fish.name} broke free. Too heavy.`, 'danger');
+                    this._setFishStatus(`${fish.name} broke free. Too heavy.`, fish, 'danger');
                     this.achievementManager.onWeightFail(fish);
                     this._recordMeasuredRodOutcome('escape', fish, 'auto');
                     this.breakCombo();
@@ -2937,12 +2994,11 @@
             logMsg += ` | +${fish.value} coins value`;
             this.log(logMsg);
 
-            let statusMsg = `Auto caught ${fish.name}.`;
-            if (fish.variant) statusMsg = `Auto ${fish.variant.icon} ${fish.variant.label} ${fish.name}.`;
-            if (isCrit) statusMsg += ` ${this._lastCriticalStatus?.text || 'CRITICAL!'}`;
-            if (storeOutcome.action === 'sold') statusMsg += ' Inventory full: catch auto-sold.';
-            if (storeOutcome.action === 'rejected') statusMsg += ` Inventory full (${MAX_INVENTORY_FISH}).`;
-            this.ui.updateStatus(statusMsg, 'success');
+            this._updateCatchStatus(fish, {
+                mode: 'auto',
+                isCrit,
+                storeOutcome
+            });
             this.ui.updateLastCatch(fish);
             this._recordMeasuredRodOutcome('catch', fish, 'auto');
             this.ui.renderStats();
