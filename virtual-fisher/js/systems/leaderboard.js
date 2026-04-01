@@ -15,7 +15,10 @@
     ]);
     const LEADERBOARD_REFRESH_MS = 20 * 60 * 1000;
     const LEADERBOARD_ENTRY_LIMIT = 10;
-    const LEADERBOARD_FETCH_TIMEOUT_MS = 12000;
+    const LEADERBOARD_FETCH_TIMEOUT_MS = 15000;
+    const LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS = 3;
+    const LEADERBOARD_AUTH_LOCK_RETRY_DELAY_MS = 250;
+    const LEADERBOARD_TRANSIENT_RETRY_DELAY_MS = 4000;
     const USERNAME_AUTH_LOCK_RETRY_ATTEMPTS = 2;
     const USERNAME_AUTH_LOCK_RETRY_DELAY_MS = 180;
 
@@ -35,6 +38,8 @@
     CloudSystem.leaderboardRefreshInFlight = false;
     CloudSystem.leaderboardRefreshCooldownUntil = 0;
     CloudSystem.leaderboardRefreshRpcUnavailable = false;
+    CloudSystem.leaderboardCachedRows = [];
+    CloudSystem.leaderboardRetryTimer = null;
 
     CloudSystem._escapeHtml = function (value) {
         const str = String(value == null ? '' : value);
@@ -462,6 +467,14 @@
     };
 
     CloudSystem._formatLeaderboardLoadError = function (error) {
+        if (this._isAuthLockContentionError(error)) {
+            return 'Leaderboard is waiting for session sync to finish. Retrying shortly.';
+        }
+
+        if (this._isLeaderboardTimeoutError(error)) {
+            return 'Leaderboard is taking longer than usual. Retrying shortly.';
+        }
+
         if (this._isRetriableCloudError(error)) {
             return 'Leaderboard is temporarily offline. Retrying on the next cycle.';
         }
@@ -479,25 +492,75 @@
             ? `Leaderboard update failed: ${message}`
             : 'Leaderboard update failed. Retrying on the next cycle.';
     };
+    CloudSystem._isLeaderboardTimeoutError = function (error) {
+        const message = String(error?.message || '').toLowerCase();
+        return message.includes('leaderboard request timed out');
+    };
+
+    CloudSystem._shouldPreserveLeaderboardRows = function (error) {
+        return this._isAuthLockContentionError(error)
+            || this._isLeaderboardTimeoutError(error)
+            || this._isRetriableCloudError(error);
+    };
+
+    CloudSystem._clearLeaderboardRetry = function () {
+        if (!this.leaderboardRetryTimer) return;
+        clearTimeout(this.leaderboardRetryTimer);
+        this.leaderboardRetryTimer = null;
+    };
+
+    CloudSystem._scheduleLeaderboardRetry = function (delayMs = LEADERBOARD_TRANSIENT_RETRY_DELAY_MS) {
+        if (this.leaderboardRetryTimer) return;
+
+        this.leaderboardRetryTimer = setTimeout(() => {
+            this.leaderboardRetryTimer = null;
+            this.refreshLeaderboards().catch((err) => {
+                console.warn('Retry leaderboard refresh failed:', err?.message || err);
+            });
+        }, Math.max(500, Number(delayMs) || LEADERBOARD_TRANSIENT_RETRY_DELAY_MS));
+    };
 
     CloudSystem._fetchLeaderboardRows = async function () {
-        const requestPromise = extensionSupabaseClient
-            .from('leaderboard_snapshots')
-            .select('metric, rank, username, score, refreshed_at')
-            .lte('rank', LEADERBOARD_ENTRY_LIMIT)
-            .order('metric', { ascending: true })
-            .order('rank', { ascending: true });
+        for (let attempt = 1; attempt <= LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS; attempt += 1) {
+            let timeoutId = null;
 
-        const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    data: null,
-                    error: { message: 'Leaderboard request timed out.' }
+            try {
+                const requestPromise = extensionSupabaseClient
+                    .from('leaderboard_snapshots')
+                    .select('metric, rank, username, score, refreshed_at')
+                    .lte('rank', LEADERBOARD_ENTRY_LIMIT)
+                    .order('metric', { ascending: true })
+                    .order('rank', { ascending: true });
+
+                const timeoutPromise = new Promise((resolve) => {
+                    timeoutId = setTimeout(() => {
+                        resolve({
+                            data: null,
+                            error: { message: 'Leaderboard request timed out.' }
+                        });
+                    }, LEADERBOARD_FETCH_TIMEOUT_MS);
                 });
-            }, LEADERBOARD_FETCH_TIMEOUT_MS);
-        });
 
-        return Promise.race([requestPromise, timeoutPromise]);
+                const result = await Promise.race([requestPromise, timeoutPromise]);
+                if (result?.error && this._isAuthLockContentionError(result.error) && attempt < LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS) {
+                    await this._wait(LEADERBOARD_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                    continue;
+                }
+
+                return result;
+            } catch (error) {
+                if (this._isAuthLockContentionError(error) && attempt < LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS) {
+                    await this._wait(LEADERBOARD_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                    continue;
+                }
+
+                return { data: null, error };
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+            }
+        }
+
+        return { data: null, error: new Error('Leaderboard request failed.') };
     };
 
     CloudSystem._parseLeaderboardScore = function (value) {
@@ -596,21 +659,43 @@
         }
 
         this.leaderboardRefreshInFlight = true;
-        this.leaderboardRefreshCooldownUntil = now + 60000;
 
         try {
-            const { data, error } = await extensionSupabaseClient.rpc('request_leaderboard_refresh');
-            if (error) {
-                if (this._looksLikeMissingRpc(error, 'request_leaderboard_refresh')) {
-                    this.leaderboardRefreshRpcUnavailable = true;
+            for (let attempt = 1; attempt <= LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS; attempt += 1) {
+                try {
+                    const { data, error } = await extensionSupabaseClient.rpc('request_leaderboard_refresh');
+                    if (error) {
+                        if (this._isAuthLockContentionError(error) && attempt < LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS) {
+                            await this._wait(LEADERBOARD_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                            continue;
+                        }
+
+                        if (this._looksLikeMissingRpc(error, 'request_leaderboard_refresh')) {
+                            this.leaderboardRefreshRpcUnavailable = true;
+                        }
+
+                        this.leaderboardRefreshCooldownUntil = Date.now()
+                            + (this._shouldPreserveLeaderboardRows(error) ? LEADERBOARD_TRANSIENT_RETRY_DELAY_MS : 60000);
+                        return { attempted: true, refreshed: false, error };
+                    }
+
+                    const refreshed = !!data?.refreshed;
+                    this.leaderboardRefreshCooldownUntil = Date.now() + 60000;
+                    return { attempted: true, refreshed, data };
+                } catch (error) {
+                    if (this._isAuthLockContentionError(error) && attempt < LEADERBOARD_AUTH_LOCK_RETRY_ATTEMPTS) {
+                        await this._wait(LEADERBOARD_AUTH_LOCK_RETRY_DELAY_MS * attempt);
+                        continue;
+                    }
+
+                    this.leaderboardRefreshCooldownUntil = Date.now()
+                        + (this._shouldPreserveLeaderboardRows(error) ? LEADERBOARD_TRANSIENT_RETRY_DELAY_MS : 60000);
+                    return { attempted: true, refreshed: false, error };
                 }
-                return { attempted: true, refreshed: false, error };
             }
 
-            const refreshed = !!data?.refreshed;
-            return { attempted: true, refreshed, data };
-        } catch (error) {
-            return { attempted: true, refreshed: false, error };
+            this.leaderboardRefreshCooldownUntil = Date.now() + LEADERBOARD_TRANSIENT_RETRY_DELAY_MS;
+            return { attempted: true, refreshed: false, error: new Error('Leaderboard refresh request failed.') };
         } finally {
             this.leaderboardRefreshInFlight = false;
         }
@@ -650,9 +735,17 @@
         }).join('');
     };
 
+    CloudSystem._renderLeaderboardGroups = function (rows) {
+        const moneyRows = rows.filter((row) => row.metric === 'money_earned');
+        const fishRows = rows.filter((row) => row.metric === 'fish_caught');
+        this._renderLeaderboardRows('leaderboard-money-list', moneyRows);
+        this._renderLeaderboardRows('leaderboard-fish-list', fishRows);
+    };
+
     CloudSystem.refreshLeaderboards = async function () {
         try {
             if (!extensionSupabaseClient) {
+                this._clearLeaderboardRetry();
                 this._setLeaderboardMeta('Leaderboard unavailable: Supabase not detected.');
                 this._renderLeaderboardRows('leaderboard-money-list', []);
                 this._renderLeaderboardRows('leaderboard-fish-list', []);
@@ -672,8 +765,13 @@
 
             if (error) {
                 this._setLeaderboardMeta(this._formatLeaderboardLoadError(error));
-                this._renderLeaderboardRows('leaderboard-money-list', []);
-                this._renderLeaderboardRows('leaderboard-fish-list', []);
+                if (this._shouldPreserveLeaderboardRows(error) && this.leaderboardCachedRows.length > 0) {
+                    this._renderLeaderboardGroups(this.leaderboardCachedRows);
+                    this._scheduleLeaderboardRetry();
+                } else {
+                    this._renderLeaderboardRows('leaderboard-money-list', []);
+                    this._renderLeaderboardRows('leaderboard-fish-list', []);
+                }
                 this._updateLeaderboardUserNote();
                 return;
             }
@@ -683,9 +781,11 @@
             const staleThresholdMs = LEADERBOARD_REFRESH_MS + (2 * 60 * 1000);
             const shouldRequestManualRefresh = rows.length === 0
                 || (latestRefreshedAtMs > 0 && (Date.now() - latestRefreshedAtMs) > staleThresholdMs);
+            let refreshError = null;
 
             if (shouldRequestManualRefresh) {
                 const refreshAttempt = await this._requestLeaderboardRefresh();
+                refreshError = refreshAttempt?.error || null;
                 const shouldRetryFetch = refreshAttempt.refreshed
                     || (refreshAttempt.attempted && !refreshAttempt.error);
 
@@ -702,26 +802,40 @@
                 }
             }
 
-            const moneyRows = rows.filter((row) => row.metric === 'money_earned');
-            const fishRows = rows.filter((row) => row.metric === 'fish_caught');
-
-            this._renderLeaderboardRows('leaderboard-money-list', moneyRows);
-            this._renderLeaderboardRows('leaderboard-fish-list', fishRows);
+            this._renderLeaderboardGroups(rows);
 
             if (rows.length === 0) {
-                this._setLeaderboardMeta('No leaderboard entries yet. Snapshots update every 20 minutes.');
+                if (refreshError && this._shouldPreserveLeaderboardRows(refreshError)) {
+                    this._setLeaderboardMeta(this._formatLeaderboardLoadError(refreshError));
+                    this._scheduleLeaderboardRetry();
+                } else {
+                    this._clearLeaderboardRetry();
+                    this._setLeaderboardMeta('No leaderboard entries yet. Snapshots update every 20 minutes.');
+                }
                 this._updateLeaderboardUserNote();
                 return;
             }
 
+            this.leaderboardCachedRows = rows;
             const refreshedAt = latestRefreshedAtMs > 0 ? new Date(latestRefreshedAtMs) : new Date();
             this.lastLeaderboardRefreshedAt = refreshedAt.getTime();
-            this._setLeaderboardMeta(`Last updated: ${refreshedAt.toLocaleString('en-US')} (refreshes every 20 minutes)`);
+            if (refreshError && this._shouldPreserveLeaderboardRows(refreshError)) {
+                this._setLeaderboardMeta(`${this._formatLeaderboardLoadError(refreshError)} Showing the latest available snapshot from ${refreshedAt.toLocaleString('en-US')}.`);
+                this._scheduleLeaderboardRetry();
+            } else {
+                this._clearLeaderboardRetry();
+                this._setLeaderboardMeta(`Last updated: ${refreshedAt.toLocaleString('en-US')} (refreshes every 20 minutes)`);
+            }
             this._updateLeaderboardUserNote();
         } catch (err) {
             this._setLeaderboardMeta(`Leaderboard update failed: ${err?.message || 'Unknown error'}`);
-            this._renderLeaderboardRows('leaderboard-money-list', []);
-            this._renderLeaderboardRows('leaderboard-fish-list', []);
+            if (this._shouldPreserveLeaderboardRows(err) && this.leaderboardCachedRows.length > 0) {
+                this._renderLeaderboardGroups(this.leaderboardCachedRows);
+                this._scheduleLeaderboardRetry();
+            } else {
+                this._renderLeaderboardRows('leaderboard-money-list', []);
+                this._renderLeaderboardRows('leaderboard-fish-list', []);
+            }
             this._updateLeaderboardUserNote();
         }
     };
@@ -731,12 +845,18 @@
             clearInterval(this.leaderboardTimer);
             this.leaderboardTimer = null;
         }
+        this._clearLeaderboardRetry();
 
-        this._setLeaderboardMeta('Loading leaderboard...');
+        this._setLeaderboardMeta('Loading leaderboard…');
         this.refreshLeaderboards().catch((err) => {
             this._setLeaderboardMeta(`Leaderboard update failed: ${err?.message || 'Unknown error'}`);
-            this._renderLeaderboardRows('leaderboard-money-list', []);
-            this._renderLeaderboardRows('leaderboard-fish-list', []);
+            if (this._shouldPreserveLeaderboardRows(err) && this.leaderboardCachedRows.length > 0) {
+                this._renderLeaderboardGroups(this.leaderboardCachedRows);
+                this._scheduleLeaderboardRetry();
+            } else {
+                this._renderLeaderboardRows('leaderboard-money-list', []);
+                this._renderLeaderboardRows('leaderboard-fish-list', []);
+            }
             this._updateLeaderboardUserNote();
             console.warn('Initial leaderboard refresh failed:', err?.message || err);
         });
