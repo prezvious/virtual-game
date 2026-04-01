@@ -28,6 +28,9 @@ secrets/
 supabase/*
 !supabase/FRESH_SETUP.md
 !supabase/virtual_harvest_fresh_setup.sql
+!supabase/migrations/
+supabase/migrations/*
+!supabase/migrations/20260402_admin_account_purge_and_atomic_admin_mutations.sql
 /output/
 output/
 public/runtime-supabase-config.js

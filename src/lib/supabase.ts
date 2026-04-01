@@ -30,7 +30,15 @@ export function createAnonServerClient() {
 
 export function createServiceSupabaseClient() {
   const { url } = getSupabaseConfig();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_FUNCTIONS_KEY || "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    || process.env.SUPABASE_FUNCTIONS_KEY?.trim();
+
+  if (!serviceKey) {
+    throw new Error(
+      "Missing required Supabase server environment variable: SUPABASE_SERVICE_ROLE_KEY or SUPABASE_FUNCTIONS_KEY"
+    );
+  }
+
   return createClient(url, serviceKey, {
     auth: {
       persistSession: false,

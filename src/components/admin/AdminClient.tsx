@@ -19,10 +19,12 @@ export default function AdminClient() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [settings, setSettings] = useState<Setting[]>([]);
   const [searchQ, setSearchQ] = useState("");
+  const [submittedSearchQ, setSubmittedSearchQ] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [tabError, setTabError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const submittedSearchQRef = useRef("");
 
   // Action form state
   const [actionType, setActionType] = useState("spawn_item");
@@ -53,7 +55,11 @@ export default function AdminClient() {
     void check();
   }, []);
 
-  const fetchTab = useCallback(async (t: Tab) => {
+  useEffect(() => {
+    submittedSearchQRef.current = submittedSearchQ;
+  }, [submittedSearchQ]);
+
+  const fetchTab = useCallback(async (t: Tab, userQuery?: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -66,7 +72,8 @@ export default function AdminClient() {
     }
     try {
       if (t === "users") {
-        const res = await fetch(`/api/admin?tab=users&q=${encodeURIComponent(searchQ)}`, {
+        const query = userQuery ?? submittedSearchQRef.current;
+        const res = await fetch(`/api/admin?tab=users&q=${encodeURIComponent(query)}`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
@@ -94,7 +101,7 @@ export default function AdminClient() {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setTabError(err instanceof Error ? err.message : "Network error. Check your connection.");
     }
-  }, [getToken, searchQ]);
+  }, [getToken]);
 
   useEffect(() => {
     if (isAdmin) void fetchTab(tab);
@@ -161,7 +168,15 @@ export default function AdminClient() {
         <section className={styles.section}>
           <div className={styles.searchBox}>
             <input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder="Search users..." className={styles.searchInput} />
-            <button onClick={() => void fetchTab("users")} className={styles.btnSmall}>Search</button>
+            <button
+              onClick={() => {
+                setSubmittedSearchQ(searchQ);
+                void fetchTab("users", searchQ);
+              }}
+              className={styles.btnSmall}
+            >
+              Search
+            </button>
           </div>
           <div className={styles.tableWrap}>
             <table className={styles.table}>

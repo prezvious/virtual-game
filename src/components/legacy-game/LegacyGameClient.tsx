@@ -129,6 +129,7 @@ export default function LegacyGameClient() {
         window.__legacyLoaderDone = true;
         setStatus("");
       } catch (error) {
+        if (cancelled) return;
         const message = error instanceof Error ? error.message : "Unknown loader error.";
         setStatus(`Game bootstrap failed: ${message}`);
       }
