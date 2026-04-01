@@ -300,6 +300,14 @@ p {
     background: rgba(63, 47, 20, 0.92);
 }
 
+.notification.notification--weather {
+    border-color: rgba(134, 239, 172, 0.55);
+    background:
+        linear-gradient(135deg, rgba(20, 83, 45, 0.96), rgba(22, 101, 52, 0.92));
+    color: #f7fee7;
+    box-shadow: 0 18px 32px rgba(20, 83, 45, 0.28);
+}
+
 .notification.legendary,
 .notification.mythic,
 .notification.celestial,

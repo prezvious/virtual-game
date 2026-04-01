@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase.auth.admin.updateUserById(user.id, { password: newPassword });
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    console.error("[password POST] Failed to update password:", error);
+    return NextResponse.json({ ok: false, error: "Failed to update password." }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, message: "Password updated successfully." });

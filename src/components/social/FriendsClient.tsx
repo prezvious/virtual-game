@@ -128,7 +128,7 @@ export default function FriendsClient() {
             const uname = getUsername(item);
             const displayName = uname || "No username";
             return (
-              <div key={`${tab}-${userId}-${index}`} className={styles.row}>
+              <div key={`${tab}-${userId}`} className={styles.row}>
                 {uname ? (
                   <Link href={`/profile/${uname}`} className={styles.userLink}>
                     <span className={styles.userAvatar}>{uname.charAt(0).toUpperCase()}</span>

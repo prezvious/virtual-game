@@ -1,6 +1,7 @@
 // ==================== NOTIFICATIONS ====================
-function showNotification(message, rarity = "common") {
+function showNotification(message, rarity = "common", options = {}) {
     const container = document.getElementById('notifications');
+    if (!container) return;
 
     // Limit visible notifications
     while (container.children.length >= MAX_NOTIFICATIONS) {
@@ -8,10 +9,12 @@ function showNotification(message, rarity = "common") {
     }
 
     const notif = document.createElement('div');
-    notif.className = `notification ${rarity}`;
+    const extraClassName = typeof options.className === "string" ? options.className.trim() : "";
+    notif.className = `notification ${rarity}${extraClassName ? ` ${extraClassName}` : ""}`;
     notif.textContent = message;
     container.appendChild(notif);
-    setTimeout(() => notif.remove(), 2500);
+    const durationMs = Number.isFinite(Number(options.durationMs)) ? Math.max(500, Number(options.durationMs)) : 2500;
+    setTimeout(() => notif.remove(), durationMs);
 }
 
 let modalReturnFocusEl = null;

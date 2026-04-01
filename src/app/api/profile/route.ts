@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient, createServiceSupabaseClient } from "@/lib/supabase";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const TRACKING_STARTED_ON = "2026-04-01";
+
+// Fix N-15: Username validation regex
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
+
+// Fix N-14: Rate limiting for profile updates
+const PROFILE_PATCH_RATE_LIMIT = 10;
+const PROFILE_PATCH_WINDOW_MS = 60_000;
 
 type AchievementRow = {
   achievement_id: string;
@@ -231,35 +239,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "User not found." }, { status: 404 });
   }
 
-  const { count: followersCount } = await serviceClient
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("following_id", profile.user_id);
+  const [{ count: followersCount, error: followersError }, { count: followingCount, error: followingError }, { data: achievements }] = await Promise.all([
+    serviceClient
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", profile.user_id),
+    serviceClient
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", profile.user_id),
+    serviceClient
+      .from("user_achievements")
+      .select("achievement_id, unlocked_at, achievements(name, icon, rarity)")
+      .eq("user_id", profile.user_id)
+      .order("unlocked_at", { ascending: false })
+      .limit(6),
+  ]);
 
-  const { count: followingCount } = await serviceClient
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("follower_id", profile.user_id);
-
-  const { data: achievements } = await serviceClient
-    .from("user_achievements")
-    .select("achievement_id, unlocked_at, achievements(name, icon, rarity)")
-    .eq("user_id", profile.user_id)
-    .order("unlocked_at", { ascending: false })
-    .limit(6);
-
+  // Fix M-3: Use nullish coalescing to handle null counts
   return NextResponse.json({
     ok: true,
     profile: {
       ...profile,
-      followers_count: followersCount || 0,
-      following_count: followingCount || 0,
+      followers_count: followersCount ?? 0,
+      following_count: followingCount ?? 0,
       recent_achievements: normalizeAchievementRows((achievements || []) as unknown[]),
     },
   });
 }
 
 export async function PATCH(req: NextRequest) {
+  // Fix N-14: Rate limit profile updates
+  const ip = getRequestIp(req);
+  const rate = consumeRateLimit({ key: `profile-patch:${ip}`, limit: PROFILE_PATCH_RATE_LIMIT, windowMs: PROFILE_PATCH_WINDOW_MS });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many updates. Try again later." }, { status: 429 });
+  }
+
   const auth = await authenticateRequest(req);
   if (!auth.user) {
     return auth.response!;
@@ -277,8 +293,14 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.avatar_url === "string") updates.avatar_url = body.avatar_url.slice(0, 500);
   const requestedUsername = typeof body.username === "string" ? body.username.trim() : null;
 
-  if (requestedUsername !== null && !requestedUsername) {
-    return NextResponse.json({ ok: false, error: "Username is required." }, { status: 400 });
+  // Fix N-15: Validate username format
+  if (requestedUsername !== null) {
+    if (!requestedUsername) {
+      return NextResponse.json({ ok: false, error: "Username is required." }, { status: 400 });
+    }
+    if (!USERNAME_REGEX.test(requestedUsername)) {
+      return NextResponse.json({ ok: false, error: "Username must be 3-30 characters, letters, numbers, underscores, or hyphens only." }, { status: 400 });
+    }
   }
 
   if (Object.keys(updates).length === 0 && requestedUsername === null) {
@@ -290,6 +312,7 @@ export async function PATCH(req: NextRequest) {
   try {
     await ensureOwnProfileRow(serviceClient, auth.user.id);
 
+    // Fix M-2: Claim username first, then update other fields - if username claim fails, no partial update
     if (requestedUsername !== null) {
       const { data, error } = await serviceClient.rpc("_claim_username_for_user", {
         target_user_id: auth.user.id,

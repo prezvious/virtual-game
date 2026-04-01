@@ -40,7 +40,7 @@ export default function AdminClient() {
   const getToken = useCallback(async () => {
     const supabase = getClientSupabase();
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || "";
+    return session?.access_token || null;
   }, []);
 
   useEffect(() => {
@@ -60,7 +60,11 @@ export default function AdminClient() {
   }, [submittedSearchQ]);
 
   const fetchTab = useCallback(async (t: Tab, userQuery?: string) => {
-    abortRef.current?.abort();
+    // Fix N-17: Atomic abort - abort previous and wait before creating new controller
+    const prevController = abortRef.current;
+    prevController?.abort();
+    // Small delay to ensure abort propagates
+    await new Promise(r => setTimeout(r, 0));
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -77,6 +81,10 @@ export default function AdminClient() {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
+        if (!res.ok) {
+          setTabError(`Failed to load users (${res.status}).`);
+          return;
+        }
         const json = await res.json();
         if (json.ok) setUsers(json.users);
         else setTabError(json.error || "Failed to load users.");
@@ -85,6 +93,10 @@ export default function AdminClient() {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
+        if (!res.ok) {
+          setTabError(`Failed to load logs (${res.status}).`);
+          return;
+        }
         const json = await res.json();
         if (json.ok) setLogs(json.logs);
         else setTabError(json.error || "Failed to load logs.");
@@ -93,6 +105,10 @@ export default function AdminClient() {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
+        if (!res.ok) {
+          setTabError(`Failed to load settings (${res.status}).`);
+          return;
+        }
         const json = await res.json();
         if (json.ok) setSettings(json.settings);
         else setTabError(json.error || "Failed to load settings.");

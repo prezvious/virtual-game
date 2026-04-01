@@ -47,13 +47,18 @@ export default function BanGuard() {
   const lastCheckRef = useRef(0);
   const consecutive401Ref = useRef(0);
   const backoffUntilRef = useRef(0);
+  const isCheckingRef = useRef(false);
 
   const syncStoredNotice = useCallback(() => {
     setNotice(readStoredNotice());
   }, []);
 
   const dismissNotice = useCallback(() => {
-    window.localStorage.removeItem(BAN_NOTICE_STORAGE_KEY);
+    try {
+      window.localStorage.removeItem(BAN_NOTICE_STORAGE_KEY);
+    } catch {
+      // localStorage unavailable
+    }
     setNotice(null);
   }, []);
 
@@ -67,7 +72,11 @@ export default function BanGuard() {
       ...(status.reason ? { reason: status.reason } : {}),
     };
 
-    window.localStorage.setItem(BAN_NOTICE_STORAGE_KEY, JSON.stringify(nextNotice));
+    try {
+      window.localStorage.setItem(BAN_NOTICE_STORAGE_KEY, JSON.stringify(nextNotice));
+    } catch {
+      // localStorage unavailable
+    }
     setNotice(nextNotice);
 
     const signOutTasks: Promise<unknown>[] = [supabase.auth.signOut()];
@@ -86,6 +95,8 @@ export default function BanGuard() {
   }, [supabase]);
 
   const checkBanStatus = useCallback(async () => {
+    // Fix M-11: Prevent concurrent checks
+    if (isCheckingRef.current) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       return;
     }
@@ -94,36 +105,45 @@ export default function BanGuard() {
     if (now < backoffUntilRef.current) return;
     if (now - lastCheckRef.current < 5000) return;
     lastCheckRef.current = now;
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      if (!window.localStorage.getItem(BAN_NOTICE_STORAGE_KEY)) {
-        handlingBanRef.current = false;
-      }
-      return;
-    }
+    isCheckingRef.current = true;
 
     try {
-      const response = await fetch("/api/auth/ban-status", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        cache: "no-store",
-      });
-      if (response.status === 401) {
-        consecutive401Ref.current += 1;
-        if (consecutive401Ref.current >= 2) {
-          backoffUntilRef.current = Date.now() + 5 * 60 * 1000;
-        }
-        if (consecutive401Ref.current >= 5) {
-          backoffUntilRef.current = Date.now() + 24 * 60 * 60 * 1000;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        try {
+          if (!window.localStorage.getItem(BAN_NOTICE_STORAGE_KEY)) {
+            handlingBanRef.current = false;
+          }
+        } catch {
+          // localStorage unavailable
         }
         return;
       }
-      consecutive401Ref.current = 0;
-      const json = await response.json() as BanStatusResponse | { ok: false; error?: string };
-      if (!response.ok || !json.ok || !json.banned) return;
-      await handleBanned(json);
-    } catch {
-      // Ignore transient check failures to avoid forcing sign-outs on network issues.
+
+      try {
+        const response = await fetch("/api/auth/ban-status", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
+        if (response.status === 401) {
+          consecutive401Ref.current += 1;
+          if (consecutive401Ref.current >= 2) {
+            backoffUntilRef.current = Date.now() + 5 * 60 * 1000;
+          }
+          if (consecutive401Ref.current >= 5) {
+            backoffUntilRef.current = Date.now() + 24 * 60 * 60 * 1000;
+          }
+          return;
+        }
+        consecutive401Ref.current = 0;
+        const json = await response.json() as BanStatusResponse | { ok: false; error?: string };
+        if (!response.ok || !json.ok || !json.banned) return;
+        await handleBanned(json);
+      } catch {
+        // Ignore transient check failures to avoid forcing sign-outs on network issues.
+      }
+    } finally {
+      isCheckingRef.current = false;
     }
   }, [handleBanned, supabase]);
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildWeatherStateKey, isWeatherGame, toPublicWeatherState } from "@/lib/weather";
 
 export async function GET(req: NextRequest) {
   const ip = getRequestIp(req);
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const game = req.nextUrl.searchParams.get("game") || "";
 
-  if (game !== "fisher" && game !== "farmer") {
+  if (!isWeatherGame(game)) {
     return NextResponse.json({ ok: false, error: "game must be 'fisher' or 'farmer'." }, { status: 400 });
   }
 
@@ -27,16 +28,23 @@ export async function GET(req: NextRequest) {
   }
 
   if (!data) {
+    const weather = toPublicWeatherState(game, null);
     return NextResponse.json({
       ok: true,
-      weather: { condition: "clear", intensity: 1 },
+      game,
+      weather,
       updated_at: null,
+      state_key: buildWeatherStateKey(weather, null),
     });
   }
 
+  const weather = toPublicWeatherState(game, data.value);
+
   return NextResponse.json({
     ok: true,
-    weather: data.value,
+    game,
+    weather,
     updated_at: data.updated_at,
+    state_key: buildWeatherStateKey(weather, data.updated_at),
   });
 }

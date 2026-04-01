@@ -27,16 +27,12 @@ export async function GET(req: NextRequest) {
     const anonClient = createAnonServerClient();
     const { data, error } = await anonClient.auth.getUser(token);
 
-    let userId = data.user?.id ?? null;
-    const authErrorCode = extractAuthErrorCode(error);
-
-    if (!userId && authErrorCode === "user_banned") {
-      userId = extractUserIdFromAccessToken(token);
-    }
-
-    if (!userId || (error && authErrorCode !== "user_banned")) {
+    // Fix N-6: Require valid session - don't extract userId from expired JWT
+    if (error || !data.user) {
       return unauthorized();
     }
+
+    const userId = data.user.id;
 
     const supabase = createServiceSupabaseClient();
     const { data: userResult, error: userError } = await supabase.auth.admin.getUserById(userId);
@@ -48,7 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     const bannedUntil = extractBannedUntil(userResult.user);
-    if (!bannedUntil && authErrorCode !== "user_banned") {
+    if (!bannedUntil) {
       return NextResponse.json({ ok: true, banned: false });
     }
 
@@ -79,8 +75,7 @@ export async function GET(req: NextRequest) {
       ...(reason ? { reason } : {}),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown server error";
-    console.error("[ban-status GET]", message);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    console.error("[ban-status GET]", error);
+    return NextResponse.json({ ok: false, error: "Failed to check ban status." }, { status: 500 });
   }
 }

@@ -55,7 +55,11 @@ export default function OnboardingFlow() {
         userIdRef.current = userId;
 
         const dismissedKey = ONBOARDING_DISMISSED_KEY(userId);
-        if (localStorage.getItem(dismissedKey) === "true") return;
+        try {
+          if (localStorage.getItem(dismissedKey) === "true") return;
+        } catch {
+          // localStorage unavailable - proceed with onboarding
+        }
 
         const { data, error } = await supabase
           .from("onboarding_progress")
@@ -71,7 +75,11 @@ export default function OnboardingFlow() {
         }
 
         if (data?.completed_at || data?.skipped) {
-          localStorage.setItem(dismissedKey, "true");
+          try {
+            localStorage.setItem(dismissedKey, "true");
+          } catch {
+            // localStorage unavailable
+          }
 
           if (data?.skipped && !data?.completed_at) {
             const { error: backfillError } = await supabase.from("onboarding_progress").upsert({
@@ -113,7 +121,11 @@ export default function OnboardingFlow() {
     const userId = userIdRef.current;
     if (!userId) return;
 
-    localStorage.setItem(ONBOARDING_DISMISSED_KEY(userId), "true");
+    try {
+      localStorage.setItem(ONBOARDING_DISMISSED_KEY(userId), "true");
+    } catch {
+      // localStorage unavailable
+    }
 
     try {
       const supabase = getClientSupabase();

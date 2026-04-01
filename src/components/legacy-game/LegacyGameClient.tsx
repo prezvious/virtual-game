@@ -53,6 +53,32 @@ function extractLegacyPayload(html: string) {
   };
 }
 
+// Fix M-5: Add timeout to script loading
+function loadScriptWithTimeout(src: string, timeoutMs = 15000): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const scriptTag = document.createElement("script");
+    scriptTag.src = src;
+    scriptTag.async = false;
+    scriptTag.defer = false;
+
+    const timer = setTimeout(() => {
+      scriptTag.remove();
+      reject(new Error(`Timeout loading legacy script: ${src}`));
+    }, timeoutMs);
+
+    scriptTag.onload = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    scriptTag.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error(`Failed to load legacy script: ${src}`));
+    };
+    document.body.appendChild(scriptTag);
+    return scriptTag;
+  });
+}
+
 async function loadLegacyScriptsInOrder(scripts: LegacyScript[]) {
   const injectedScripts: HTMLScriptElement[] = [];
 
@@ -65,15 +91,9 @@ async function loadLegacyScriptsInOrder(scripts: LegacyScript[]) {
       }
 
       const scriptUrl = rewriteLegacyAssetPath(src);
+      // Fix M-5: Use timeout-based loading
       await new Promise<void>((resolve, reject) => {
-        const scriptTag = document.createElement("script");
-        scriptTag.src = scriptUrl;
-        scriptTag.async = false;
-        scriptTag.defer = false;
-        scriptTag.onload = () => resolve();
-        scriptTag.onerror = () => reject(new Error(`Failed to load legacy script: ${scriptUrl}`));
-        document.body.appendChild(scriptTag);
-        injectedScripts.push(scriptTag);
+        loadScriptWithTimeout(scriptUrl).then(resolve).catch(reject);
       });
       continue;
     }
@@ -139,6 +159,8 @@ export default function LegacyGameClient() {
     return () => {
       cancelled = true;
       window.__legacyLoaderDone = false;
+      // Fix M-6: Clean up window.supabase on unmount
+      delete window.supabase;
       cleanupScripts?.();
     };
   }, []);

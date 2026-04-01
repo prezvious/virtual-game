@@ -102,6 +102,8 @@ export default function AuthCallbackClient() {
 
         if (applied) {
           window.setTimeout(() => {
+            // Fix H-7: Re-check mounted before redirecting
+            if (!mounted) return;
             router.replace("/account-center");
           }, 1200);
         }

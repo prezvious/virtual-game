@@ -14,7 +14,8 @@ export type LeaderboardModel = {
 };
 
 function formatScore(value: unknown): string {
-  if (typeof value === "bigint") return value.toLocaleString("en-US");
+  // Fix L-2: Handle bigint negative consistently with number handling
+  if (typeof value === "bigint") return (value < BigInt(0) ? BigInt(0) : value).toLocaleString("en-US");
   if (typeof value === "number") return Math.max(0, Math.floor(value)).toLocaleString("en-US");
 
   const text = String(value ?? "").trim();

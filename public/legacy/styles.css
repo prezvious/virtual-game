@@ -2333,6 +2333,10 @@ tr:hover td {
     color: #cbd5e1;
 }
 
+.weather-activity-toast .achievement-toast-title {
+    color: #86efac;
+}
+
 @keyframes slide-in-right {
     from {
         opacity: 0;

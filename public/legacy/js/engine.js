@@ -84,6 +84,13 @@
                 timer: null,
                 purchasedTimers: {}
             };
+            this.serverWeather = {
+                expiresAt: 0,
+                announcementId: null,
+                lastStateKey: null,
+                channel: null
+            };
+            this._seenWeatherAnnouncementIds = new Set();
 
             this.minigame = {
                 active: false,
@@ -1219,8 +1226,13 @@
 
             if (!Number.isFinite(this.weather.expiresAt) || this.weather.expiresAt <= 0) return;
             const delay = Math.max(0, this.weather.expiresAt - Date.now());
+            const scheduledExpiry = this.weather.expiresAt;
             this.weather.timer = this._workerTimeout(() => {
                 this.weather.timer = null;
+                if (this.serverWeather.expiresAt > 0 && scheduledExpiry === this.serverWeather.expiresAt) {
+                    this._clearServerWeatherOverride({ logChange: true, persist: true });
+                    return;
+                }
                 this._rollNextNaturalWeather();
             }, delay);
         }
@@ -1343,11 +1355,14 @@
                 ? providedExpiry
                 : now + NATURAL_WEATHER_DURATION_MS;
             const logChange = options.logChange !== false;
+            const persistNatural = options.persistNatural !== false;
 
             this.weather.current = safeType;
             this.weather.expiresAt = expiresAt;
-            this.state.naturalWeatherKey = safeType;
-            this.state.naturalWeatherExpiresAt = expiresAt;
+            if (persistNatural) {
+                this.state.naturalWeatherKey = safeType;
+                this.state.naturalWeatherExpiresAt = expiresAt;
+            }
 
             this._applyWeatherClasses();
             this._scheduleNaturalWeatherTimer();
@@ -1359,9 +1374,201 @@
         }
 
         /* --- SERVER WEATHER INTEGRATION --- */
+        _normalizeServerWeatherPayload(rawWeather) {
+            const source = rawWeather && typeof rawWeather === 'object' ? rawWeather : {};
+            const condition = String(source.condition || 'clear').toLowerCase();
+            const intensity = Math.max(1, Math.min(5, Number(source.intensity) || 1));
+            const expiresAtText = typeof source.expires_at === 'string' ? source.expires_at : '';
+            const expiresAt = Date.parse(expiresAtText);
+            const durationMinutes = Number.isFinite(Number(source.duration_minutes))
+                ? Math.max(30, Math.min(60, Math.floor(Number(source.duration_minutes))))
+                : null;
+            const announcementId = typeof source.announcement_id === 'string' && source.announcement_id.trim()
+                ? source.announcement_id.trim()
+                : null;
+
+            if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+                return {
+                    condition: 'clear',
+                    intensity: 1,
+                    expires_at: null,
+                    duration_minutes: null,
+                    announcement_id: null,
+                    active: false,
+                    remaining_ms: null
+                };
+            }
+
+            return {
+                condition: WEATHER_DATA[condition] ? condition : 'clear',
+                intensity,
+                expires_at: new Date(expiresAt).toISOString(),
+                duration_minutes: durationMinutes,
+                announcement_id: announcementId,
+                active: true,
+                remaining_ms: Math.max(0, expiresAt - Date.now())
+            };
+        }
+
+        _buildServerWeatherStateKey(weather, updatedAt = null) {
+            return [
+                updatedAt || 'none',
+                weather.active ? 'active' : 'inactive',
+                weather.condition,
+                String(weather.intensity),
+                weather.announcement_id || 'none',
+                weather.expires_at || 'none'
+            ].join('|');
+        }
+
+        _getServerWeatherAnnouncementStorageKey(announcementId) {
+            return `vh-weather-announcement:${announcementId}`;
+        }
+
+        _showServerWeatherAnnouncement(weather) {
+            if (!weather.active || !weather.announcement_id) return;
+
+            if (this._seenWeatherAnnouncementIds.has(weather.announcement_id)) return;
+            this._seenWeatherAnnouncementIds.add(weather.announcement_id);
+
+            const storageKey = this._getServerWeatherAnnouncementStorageKey(weather.announcement_id);
+            try {
+                if (localStorage.getItem(storageKey) === 'seen') return;
+                localStorage.setItem(storageKey, 'seen');
+            } catch (err) {
+                // Storage access failures should not block the toast.
+            }
+
+            const weatherMeta = WEATHER_DATA[weather.condition] || WEATHER_DATA.clear;
+            const durationMinutes = Number(weather.duration_minutes) || null;
+            const remainingMinutes = Number.isFinite(Number(weather.remaining_ms))
+                ? Math.max(1, Math.ceil(Number(weather.remaining_ms) / 60000))
+                : null;
+            const toast = document.createElement('div');
+            toast.className = 'achievement-toast weather-activity-toast';
+            toast.innerHTML = `
+                <div class="achievement-toast-icon">${weatherMeta.icon}</div>
+                <div class="achievement-toast-body">
+                    <div class="achievement-toast-title">Virtual Fisher Weather Active</div>
+                    <div class="achievement-toast-name">${weatherMeta.name}</div>
+                    <div class="achievement-toast-desc">${durationMinutes ? `Duration: ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.` : 'Limited event.'}${remainingMinutes ? ` Ends in about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.` : ''}</div>
+                </div>
+            `;
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => toast.classList.add('show'));
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.classList.add('hide');
+                setTimeout(() => toast.remove(), 500);
+            }, 20_000);
+        }
+
+        _applyServerWeatherOverride(weather, options = {}) {
+            if (!weather.active) {
+                this._clearServerWeatherOverride({ logChange: false, persist: options.persist !== false });
+                return;
+            }
+
+            const expiresAt = Date.parse(weather.expires_at);
+            this.serverWeather.expiresAt = expiresAt;
+            this.serverWeather.announcementId = weather.announcement_id || null;
+            this.setWeather(weather.condition, {
+                expiresAt,
+                logChange: options.logChange !== false,
+                persistNatural: false
+            });
+
+            if (options.announce !== false) {
+                this._showServerWeatherAnnouncement(weather);
+            }
+            if (options.persist !== false) {
+                this.saveSystem.save();
+            }
+        }
+
+        _clearServerWeatherOverride(options = {}) {
+            if (this.serverWeather.expiresAt <= 0) return;
+
+            this.serverWeather.expiresAt = 0;
+            this.serverWeather.announcementId = null;
+
+            const now = Date.now();
+            const savedKey = WEATHER_DATA[this.state.naturalWeatherKey] ? this.state.naturalWeatherKey : null;
+            const savedExpiry = Number(this.state.naturalWeatherExpiresAt);
+
+            if (savedKey && Number.isFinite(savedExpiry) && savedExpiry > now) {
+                this.setWeather(savedKey, { expiresAt: savedExpiry, logChange: false, persistNatural: true });
+                if (options.logChange !== false) {
+                    this.log('Admin weather ended. Natural weather resumed.');
+                }
+            } else {
+                this._rollNextNaturalWeather();
+                if (options.logChange !== false) {
+                    this.log('Admin weather ended. Rolling new natural weather.');
+                }
+            }
+
+            if (options.persist !== false) {
+                this.saveSystem.save();
+            }
+        }
+
+        _processServerWeatherUpdate(rawWeather, updatedAt = null, options = {}) {
+            const normalizedWeather = this._normalizeServerWeatherPayload(rawWeather);
+            const nextStateKey = typeof options.stateKey === 'string' && options.stateKey
+                ? options.stateKey
+                : this._buildServerWeatherStateKey(normalizedWeather, updatedAt);
+
+            if (nextStateKey && nextStateKey === this.serverWeather.lastStateKey) {
+                if (normalizedWeather.active) {
+                    this.serverWeather.expiresAt = Date.parse(normalizedWeather.expires_at);
+                    this._scheduleNaturalWeatherTimer();
+                }
+                return;
+            }
+
+            this.serverWeather.lastStateKey = nextStateKey;
+            this._applyServerWeatherOverride(normalizedWeather, options);
+        }
+
+        _initServerWeatherRealtime() {
+            if (this.serverWeather.channel) return;
+
+            const bridge = window.PlatformAccountBridge;
+            if (!bridge || typeof bridge.getClient !== 'function') return;
+
+            let client = null;
+            try {
+                client = bridge.getClient('fisher');
+            } catch (err) {
+                client = null;
+            }
+
+            if (!client || typeof client.channel !== 'function') return;
+
+            this.serverWeather.channel = client
+                .channel('weather:fisher')
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'platform_settings',
+                    filter: 'key=eq.fisher_weather'
+                }, (payload) => {
+                    if (!payload || !payload.new) return;
+                    this._processServerWeatherUpdate(payload.new.value, payload.new.updated_at || null, {
+                        announce: true,
+                        logChange: true,
+                        persist: true
+                    });
+                })
+                .subscribe();
+        }
+
         _startServerWeatherPolling() {
-            this._serverWeatherLastUpdated = null;
             this._fetchServerWeather();
+            this._initServerWeatherRealtime();
             this._serverWeatherTimer = setInterval(() => this._fetchServerWeather(), 3 * 60 * 1000);
         }
 
@@ -1372,24 +1579,15 @@
                 const json = await res.json();
                 if (!json.ok) return;
 
-                const { weather, updated_at } = json;
-                if (!weather || !weather.condition) return;
+                const { weather, updated_at, state_key } = json;
+                if (!weather) return;
 
-                // Skip if we already applied this update
-                if (updated_at && updated_at === this._serverWeatherLastUpdated) return;
-                this._serverWeatherLastUpdated = updated_at;
-
-                const condition = String(weather.condition).toLowerCase();
-                if (condition === 'clear' || condition === 'auto') return;
-
-                // Map admin conditions to WEATHER_DATA keys
-                const key = WEATHER_DATA[condition] ? condition : null;
-                if (!key) return;
-
-                // Apply server weather as current natural weather
-                const duration = NATURAL_WEATHER_DURATION_MS;
-                this.setWeather(key, { expiresAt: Date.now() + duration, logChange: true });
-                this.saveSystem.save();
+                this._processServerWeatherUpdate(weather, updated_at || null, {
+                    stateKey: typeof state_key === 'string' ? state_key : null,
+                    announce: true,
+                    logChange: true,
+                    persist: true
+                });
             } catch (err) {
                 // Silently ignore fetch errors (offline, etc.)
             }

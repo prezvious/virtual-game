@@ -167,6 +167,11 @@ const FARMER_WEATHER = {
 let currentWeather = { condition: 'clear', intensity: 1 };
 let weatherLastUpdated = null;
 let weatherPollTimer = null;
+let weatherStateKey = null;
+let weatherResetTimer = null;
+let weatherRealtimeChannel = null;
+const WEATHER_ANNOUNCEMENT_DURATION_MS = 20 * 1000;
+const WEATHER_ANNOUNCEMENT_STORAGE_PREFIX = 'vh-weather-announcement:';
 
 function getWeatherEffects() {
     const w = FARMER_WEATHER[currentWeather.condition] || FARMER_WEATHER.clear;
@@ -191,6 +196,155 @@ function updateWeatherDisplay() {
     if (card) card.title = w.desc;
 }
 
+function getFarmerWeatherAnnouncementStorageKey(announcementId) {
+    return `${WEATHER_ANNOUNCEMENT_STORAGE_PREFIX}${announcementId}`;
+}
+
+function normalizeFarmerWeatherPayload(rawWeather) {
+    const source = rawWeather && typeof rawWeather === 'object' ? rawWeather : {};
+    const condition = String(source.condition || 'clear').toLowerCase();
+    const intensity = Math.max(1, Math.min(5, Number(source.intensity) || 1));
+    const expiresAtText = typeof source.expires_at === 'string' ? source.expires_at : '';
+    const expiresAtMs = Date.parse(expiresAtText);
+    const durationMinutes = Number.isFinite(Number(source.duration_minutes))
+        ? Math.max(30, Math.min(60, Math.floor(Number(source.duration_minutes))))
+        : null;
+    const announcementId = typeof source.announcement_id === 'string' && source.announcement_id.trim()
+        ? source.announcement_id.trim()
+        : null;
+
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+        return {
+            condition: 'clear',
+            intensity: 1,
+            expires_at: null,
+            duration_minutes: null,
+            announcement_id: null,
+            active: false,
+            remaining_ms: null,
+        };
+    }
+
+    return {
+        condition: FARMER_WEATHER[condition] ? condition : 'clear',
+        intensity,
+        expires_at: new Date(expiresAtMs).toISOString(),
+        duration_minutes: durationMinutes,
+        announcement_id: announcementId,
+        active: true,
+        remaining_ms: Math.max(0, expiresAtMs - Date.now()),
+    };
+}
+
+function buildFarmerWeatherStateKey(weather, updatedAt = null) {
+    return [
+        updatedAt || 'none',
+        weather.active ? 'active' : 'inactive',
+        weather.condition,
+        String(weather.intensity),
+        weather.announcement_id || 'none',
+        weather.expires_at || 'none',
+    ].join('|');
+}
+
+function clearFarmerWeatherResetTimer() {
+    if (!weatherResetTimer) return;
+    clearTimeout(weatherResetTimer);
+    weatherResetTimer = null;
+}
+
+function scheduleFarmerWeatherReset(weather) {
+    clearFarmerWeatherResetTimer();
+
+    const expiresAtMs = Date.parse(String(weather && weather.expires_at ? weather.expires_at : ''));
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+        currentWeather = { condition: 'clear', intensity: 1 };
+        updateWeatherDisplay();
+        return;
+    }
+
+    weatherResetTimer = setTimeout(() => {
+        weatherResetTimer = null;
+        currentWeather = { condition: 'clear', intensity: 1 };
+        updateWeatherDisplay();
+    }, expiresAtMs - Date.now());
+}
+
+function showFarmerWeatherAnnouncement(weather) {
+    if (!weather.active || !weather.announcement_id) return;
+
+    const storageKey = getFarmerWeatherAnnouncementStorageKey(weather.announcement_id);
+    try {
+        if (localStorage.getItem(storageKey) === 'seen') return;
+        localStorage.setItem(storageKey, 'seen');
+    } catch (e) {
+        // Ignore storage failures and continue showing the toast.
+    }
+
+    const weatherName = (FARMER_WEATHER[weather.condition] || FARMER_WEATHER.clear).name;
+    const durationMinutes = Number(weather.duration_minutes) || null;
+    const remainingMinutes = Number.isFinite(Number(weather.remaining_ms))
+        ? Math.max(1, Math.ceil(Number(weather.remaining_ms) / 60000))
+        : null;
+
+    let message = `Virtual Farmer: ${weatherName} weather is active`;
+    if (durationMinutes) {
+        message += ` for ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.`;
+    } else {
+        message += '.';
+    }
+    if (remainingMinutes) {
+        message += ` Ends in about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`;
+    }
+
+    showNotification(message, 'achievement', {
+        durationMs: WEATHER_ANNOUNCEMENT_DURATION_MS,
+        className: 'notification--weather',
+    });
+}
+
+function applyFarmerWeatherState(weather, options = {}) {
+    const nextWeather = weather.active
+        ? {
+            condition: FARMER_WEATHER[weather.condition] ? weather.condition : 'clear',
+            intensity: Math.max(1, Math.min(5, Number(weather.intensity) || 1)),
+        }
+        : { condition: 'clear', intensity: 1 };
+    const weatherChanged = currentWeather.condition !== nextWeather.condition || currentWeather.intensity !== nextWeather.intensity;
+
+    currentWeather = nextWeather;
+    if (weatherChanged) {
+        updateWeatherDisplay();
+    }
+
+    if (weather.active) {
+        scheduleFarmerWeatherReset(weather);
+        if (options.announce !== false) {
+            showFarmerWeatherAnnouncement(weather);
+        }
+        return;
+    }
+
+    clearFarmerWeatherResetTimer();
+}
+
+function processFarmerWeatherUpdate(rawWeather, updatedAt = null, options = {}) {
+    const normalizedWeather = normalizeFarmerWeatherPayload(rawWeather);
+    const nextStateKey = typeof options.stateKey === 'string' && options.stateKey
+        ? options.stateKey
+        : buildFarmerWeatherStateKey(normalizedWeather, updatedAt);
+
+    if (nextStateKey && nextStateKey === weatherStateKey) {
+        if (normalizedWeather.active) {
+            scheduleFarmerWeatherReset(normalizedWeather);
+        }
+        return;
+    }
+
+    weatherStateKey = nextStateKey;
+    applyFarmerWeatherState(normalizedWeather, options);
+}
+
 async function fetchFarmerWeather() {
     try {
         const res = await fetch('/api/weather?game=farmer');
@@ -198,23 +352,54 @@ async function fetchFarmerWeather() {
         const json = await res.json();
         if (!json.ok || !json.weather) return;
 
-        if (json.updated_at && json.updated_at === weatherLastUpdated) return;
-        weatherLastUpdated = json.updated_at;
-
-        const condition = String(json.weather.condition || 'clear').toLowerCase();
-        const intensity = Number(json.weather.intensity) || 1;
-
-        if (currentWeather.condition !== condition || currentWeather.intensity !== intensity) {
-            currentWeather = { condition, intensity };
-            updateWeatherDisplay();
+        if (json.updated_at) {
+            weatherLastUpdated = json.updated_at;
         }
+        processFarmerWeatherUpdate(json.weather, json.updated_at || null, {
+            stateKey: typeof json.state_key === 'string' ? json.state_key : null,
+            announce: true,
+        });
     } catch (e) {
         // Silently ignore (offline, etc.)
     }
 }
 
+function getFarmerWeatherRealtimeClient() {
+    const bridge = window.PlatformAccountBridge;
+    if (!bridge || typeof bridge.getClient !== 'function') return null;
+
+    try {
+        return bridge.getClient('farmer');
+    } catch (e) {
+        return null;
+    }
+}
+
+function startFarmerWeatherRealtime() {
+    if (weatherRealtimeChannel) return;
+
+    const client = getFarmerWeatherRealtimeClient();
+    if (!client || typeof client.channel !== 'function') return;
+
+    weatherRealtimeChannel = client
+        .channel('weather:farmer')
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'platform_settings',
+            filter: 'key=eq.farmer_weather',
+        }, (payload) => {
+            if (!payload || !payload.new) return;
+            processFarmerWeatherUpdate(payload.new.value, payload.new.updated_at || null, {
+                announce: true,
+            });
+        })
+        .subscribe();
+}
+
 function startWeatherPolling() {
     fetchFarmerWeather();
+    startFarmerWeatherRealtime();
     weatherPollTimer = setInterval(fetchFarmerWeather, 3 * 60 * 1000);
 }
 

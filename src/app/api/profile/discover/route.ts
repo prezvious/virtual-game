@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceSupabaseClient } from "@/lib/supabase";
+import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
+import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 24;
+
+// Fix N-13: Rate limiting for profile discover to prevent enumeration
+const DISCOVER_RATE_LIMIT = 20;
+const DISCOVER_WINDOW_MS = 60_000;
 
 function sanitizeLimit(rawValue: string | null) {
   const parsed = Number(rawValue || DEFAULT_LIMIT);
@@ -10,7 +15,30 @@ function sanitizeLimit(rawValue: string | null) {
   return Math.min(Math.max(Math.floor(parsed), 1), MAX_LIMIT);
 }
 
+// Fix C-1: Add authentication check before using service client
+async function getAuthUser(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) return null;
+  const supabase = createAnonServerClient();
+  const { data: { user }, error } = await supabase.auth.getUser(stripBearer(authHeader));
+  if (error || !user) return null;
+  return user;
+}
+
 export async function GET(req: NextRequest) {
+  // Fix N-13: Rate limit to prevent username enumeration
+  const ip = getRequestIp(req);
+  const rate = consumeRateLimit({ key: `discover:${ip}`, limit: DISCOVER_RATE_LIMIT, windowMs: DISCOVER_WINDOW_MS });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
+  // Fix C-1: Require authentication to prevent unauthenticated DB enumeration
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
   const query = req.nextUrl.searchParams.get("q")?.trim() || "";
   const limit = sanitizeLimit(req.nextUrl.searchParams.get("limit"));
   const supabase = createServiceSupabaseClient();
@@ -22,7 +50,9 @@ export async function GET(req: NextRequest) {
     .neq("username", "");
 
   if (query) {
-    builder = builder.ilike("username", `%${query}%`);
+    // Fix H-3: Escape SQL wildcard characters to prevent wildcard injection
+    const escapedQuery = query.replace(/[%_\\]/g, '\\$&');
+    builder = builder.ilike("username", `%${escapedQuery}%`);
   }
 
   const { data, error } = await builder
@@ -31,7 +61,7 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     return NextResponse.json(
-      { ok: false, error: error.message || "Could not load public profiles." },
+      { ok: false, error: "Could not load public profiles." },
       { status: 500 },
     );
   }

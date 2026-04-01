@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractBannedUntil } from "@/lib/ban";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { createAdminWeatherValue, isWeatherGame } from "@/lib/weather";
 
 type AdminInventoryRpcResult = {
   ok?: boolean;
@@ -42,6 +43,13 @@ async function verifyAdmin(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    // Fix H-2: Add rate limiting to GET endpoints
+    const ip = getRequestIp(req);
+    const rate = consumeRateLimit({ key: `admin-get:${ip}`, limit: 30, windowMs: 60_000 });
+    if (!rate.allowed) {
+      return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
+    }
+
     const admin = await verifyAdmin(req);
     if (!admin) return forbidden();
 
@@ -56,7 +64,11 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (q) query = query.ilike("username", `%${q}%`);
+      if (q) {
+        // Fix H-3: Escape SQL wildcard characters
+        const escapedQ = q.replace(/[%_\\]/g, '\\$&');
+        query = query.ilike("username", `%${escapedQ}%`);
+      }
       const { data, error } = await query;
       if (error) {
         return NextResponse.json({ ok: false, error: "Failed to fetch users." }, { status: 500 });
@@ -105,9 +117,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: false, error: `Unknown tab: ${tab}.` }, { status: 400 });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown server error";
-    console.error("[admin GET]", message);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // Fix M-1: Don't leak internal error details to client
+    console.error("[admin GET]", err);
+    return NextResponse.json({ ok: false, error: "An internal error occurred." }, { status: 500 });
   }
 }
 
@@ -158,11 +170,15 @@ export async function POST(req: NextRequest) {
       });
 
       if (error) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        // Fix M-4: Log failed admin actions
+        await logAction({ item_id: itemId, delta: quantity, error: error.message });
+        return NextResponse.json({ ok: false, error: "Failed to update inventory." }, { status: 500 });
       }
 
       const result = data as AdminInventoryRpcResult | null;
       if (!result?.ok || typeof result.quantity !== "number") {
+        // Fix M-4: Log failed admin actions
+        await logAction({ item_id: itemId, delta: quantity, error: result?.reason || "RPC returned invalid result" });
         return NextResponse.json(
           { ok: false, error: result?.reason || "Failed to update inventory." },
           { status: 400 },
@@ -174,16 +190,21 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "set_weather") {
+      // Fix M-8: Validate condition against allowed values
+      const ALLOWED_CONDITIONS = new Set(["clear", "rain", "storm", "fog", "snow", "wind"]);
       const condition = String(body.condition || "clear");
+      if (!ALLOWED_CONDITIONS.has(condition)) {
+        return NextResponse.json({ ok: false, error: "Invalid weather condition." }, { status: 400 });
+      }
       const intensity = Math.min(Math.max(1, Number(body.intensity) || 1), 5);
       const game = String(body.game || "").toLowerCase();
 
-      if (game !== "fisher" && game !== "farmer") {
+      if (!isWeatherGame(game)) {
         return NextResponse.json({ ok: false, error: "game must be 'fisher' or 'farmer'." }, { status: 400 });
       }
 
       const settingsKey = `${game}_weather`;
-      const weatherValue = { condition, intensity };
+      const weatherValue = createAdminWeatherValue(condition, intensity);
       const now = new Date().toISOString();
 
       const { error: writeError } = await supabase
@@ -197,8 +218,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: writeError.message }, { status: 500 });
       }
 
-      await logAction({ game, condition, intensity });
-      return NextResponse.json({ ok: true, message: `${game} weather set to ${condition} (${intensity}).` });
+      await logAction({
+        game,
+        condition: weatherValue.condition,
+        intensity: weatherValue.intensity,
+        started_at: weatherValue.started_at,
+        expires_at: weatherValue.expires_at,
+        duration_minutes: weatherValue.duration_minutes,
+        announcement_id: weatherValue.announcement_id,
+        source: weatherValue.source,
+      });
+      return NextResponse.json({
+        ok: true,
+        message: `${game} weather set to ${weatherValue.condition} (${weatherValue.intensity}) for ${weatherValue.duration_minutes} minutes.`,
+        duration_minutes: weatherValue.duration_minutes,
+        announcement_id: weatherValue.announcement_id,
+      });
     }
 
     if (action === "add_money" || action === "remove_money") {
@@ -214,11 +249,15 @@ export async function POST(req: NextRequest) {
       });
 
       if (error) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        // Fix M-4: Log failed admin actions
+        await logAction({ delta, error: error.message });
+        return NextResponse.json({ ok: false, error: "Failed to update balance." }, { status: 500 });
       }
 
       const result = data as AdminBalanceRpcResult | null;
       if (!result?.ok || result.coins === undefined) {
+        // Fix M-4: Log failed admin actions
+        await logAction({ delta, error: result?.reason || "RPC returned invalid result" });
         return NextResponse.json(
           { ok: false, error: result?.reason || "Failed to update balance." },
           { status: 400 },
@@ -300,6 +339,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "Cannot delete another admin." }, { status: 403 });
       }
 
+      // Fix H-5: Delete related records before deleting the auth user
+      // Delete in order to respect foreign key constraints
+      await supabase.from("user_achievements").delete().eq("user_id", targetId);
+      await supabase.from("user_game_stats").delete().eq("user_id", targetId);
+      await supabase.from("follows").delete().eq("follower_id", targetId);
+      await supabase.from("follows").delete().eq("following_id", targetId);
+      await supabase.from("blocks").delete().eq("blocker_id", targetId);
+      await supabase.from("blocks").delete().eq("blocked_id", targetId);
+      await supabase.from("user_profiles").delete().eq("user_id", targetId);
+
       const { error: deleteError } = await supabase.auth.admin.deleteUser(targetId);
       if (deleteError) {
         await logAction({ reason: String(body.reason || "Admin action"), error: deleteError.message });
@@ -316,8 +365,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: false, error: "Unknown action." }, { status: 400 });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown server error";
-    console.error("[admin POST]", message);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // Fix M-1: Don't leak internal error details
+    console.error("[admin POST]", err);
+    return NextResponse.json({ ok: false, error: "An internal error occurred." }, { status: 500 });
   }
 }

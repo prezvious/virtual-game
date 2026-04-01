@@ -96,6 +96,14 @@ function ensureSupabaseScript(): Promise<void> {
         currentScript.dataset.loadFailed = "true";
         reject(new Error("Supabase client script failed to load."));
       });
+      // Fix M-7: Check if script already loaded before adding listeners
+      if ((currentScript as HTMLScriptElement & { readyState?: string }).readyState === "complete") {
+        if (hasSupabaseFactory()) {
+          resolve();
+        } else {
+          reject(new Error("Supabase client library is not available."));
+        }
+      }
       return;
     }
 
@@ -153,6 +161,14 @@ function ensureRuntimeConfigScript(): Promise<void> {
         currentScript.dataset.loadFailed = "true";
         reject(new Error("Runtime auth config failed to load."));
       });
+      // Fix M-7: Check if script already loaded
+      if ((currentScript as HTMLScriptElement & { readyState?: string }).readyState === "complete") {
+        if (hasRuntimeConfig()) {
+          resolve();
+        } else {
+          reject(new Error("Runtime auth config loaded without platform settings."));
+        }
+      }
       return;
     }
 
@@ -207,6 +223,14 @@ async function ensureBridgeScript(): Promise<AccountBridgeApi> {
         (currentScript as HTMLScriptElement).dataset.loadFailed = "true";
         reject(new Error("Bridge script failed to load."));
       });
+      // Fix M-7: Check if script already loaded
+      if ((currentScript as HTMLScriptElement & { readyState?: string }).readyState === "complete") {
+        if (window.PlatformAccountBridge) {
+          resolve(window.PlatformAccountBridge);
+        } else {
+          reject(new Error("Bridge loaded without API."));
+        }
+      }
       return;
     }
 
