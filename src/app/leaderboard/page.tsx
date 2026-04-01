@@ -6,8 +6,8 @@ import styles from "./leaderboard.module.css";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Leaderboard | Fish It!",
-  description: "Public leaderboard for Fish It! Enhanced Edition.",
+  title: "Leaderboard",
+  description: "Public leaderboard for the Virtual Harvest platform.",
 };
 
 export default async function LeaderboardPage() {

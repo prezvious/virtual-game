@@ -25,8 +25,9 @@
 *.log
 secrets/
 **/secrets/
-/supabase/
-supabase/
+supabase/*
+!supabase/FRESH_SETUP.md
+!supabase/virtual_harvest_fresh_setup.sql
 /output/
 output/
 public/runtime-supabase-config.js

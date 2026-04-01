@@ -119,10 +119,10 @@ export default function LeaderboardLive({ initialModel }: Props) {
       <section className={styles.footer}>
         <div className={styles.actionRow}>
           <Link className={`${styles.btn} ${styles.btnSecondary}`} href="/home">
-            Platform Home
+            Return Home
           </Link>
           <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/fish">
-            Play Game
+            Open Virtual Fisher
           </Link>
         </div>
       </section>

@@ -2,14 +2,15 @@
 
 Last updated: April 1, 2026
 
-This repo is the current web home for Virtual Harvest: a Next.js launcher site that wraps both legacy games in one shared platform. The idea is simple: land on one site, sign in once, open either world, and keep the account-facing parts of the experience in one place instead of bouncing between separate builds.
+This repo is the current web home for Virtual Harvest: a Next.js platform that unifies Virtual Fisher and Virtual Farmer behind one consistent route system, one account layer, and one shared profile/community surface.
 
-The site is no longer just a thin shell around old files. It now has a real landing page, a proper account home, dedicated launcher routes for both games, player profile pages, social pages, achievements, a live leaderboard, and an admin surface for platform management.
+The goal is simple: use `/home` as the real front door, move account-specific tools into `/account-center`, keep `/fish` and `/farm` as direct game routes, and stop treating the platform as two disconnected website systems.
 
 ## What Changed In This Version
 
-- The landing page at `/` is now the front door for the whole project instead of a placeholder.
-- `/home` works like the main account center. It shows account status, linked game state, and launch points for Fisher and Farmer.
+- `/home` is the canonical platform home.
+- `/account-center` now holds sign-in, linking, sign-out, and onboarding.
+- `/` redirects to `/home`.
 - `/fish` and `/farm` are the main play routes now. The older `/play` and `/farmer` paths stick around as redirects so old links do not feel broken.
 - Profiles are shared across the platform. Players get one username, one profile note, one account page, and a public profile route at `/profile/[username]`.
 - Social features are split into their own page at `/friends`, with views for friends, followers, following, and blocked users.
@@ -19,8 +20,9 @@ The site is no longer just a thin shell around old files. It now has a real land
 
 ## Main Routes
 
-- `/` - landing page
-- `/home` - account hub and launcher
+- `/` - redirect to `/home`
+- `/home` - platform home
+- `/account-center` - account access, linking, and onboarding
 - `/fish` - Virtual Fisher in the embedded runtime shell
 - `/farm` - Virtual Farmer in the embedded runtime shell
 - `/leaderboard` - live leaderboard page
@@ -44,11 +46,33 @@ Open `http://localhost:3000`.
 Useful scripts:
 
 ```bash
+npm run build-supabase-baseline
 npm run sync-public-auth-config
 npm run build
 npm run start
 npm run lint
 ```
+
+## Supabase Setup
+
+For a brand-new Supabase project or a full database reset, use `supabase/virtual_harvest_fresh_setup.sql`.
+
+Recommended flow:
+
+```bash
+npm run build-supabase-baseline
+```
+
+Then paste `supabase/virtual_harvest_fresh_setup.sql` into the Supabase SQL Editor and run it once on the empty database.
+
+Use `supabase/migrations/` for migration history and incremental updates. Do not delete those files just because you now have a fresh-start SQL bundle. Existing environments still rely on migration history.
+
+Auth settings to verify after the SQL is applied:
+
+- Site URL: your deployed app origin, such as `https://virtual-game-theta.vercel.app`
+- Redirect URL: `https://virtual-game-theta.vercel.app/auth/callback`
+- Public env keys: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Server env key: `SUPABASE_SERVICE_ROLE_KEY`
 
 ## Using It Offline
 
@@ -67,10 +91,10 @@ Then open `http://localhost:3000`.
 
 What still works well in this mode:
 
-- the landing page
-- the account home layout
+- the platform home
+- the account center layout
 - the embedded Fisher and Farmer routes
-- the legacy game files themselves
+- the shipped game runtime files themselves
 
 What may stay unavailable unless you add your own local account-sync setup:
 
@@ -81,7 +105,7 @@ What may stay unavailable unless you add your own local account-sync setup:
 - achievement sync
 - admin actions
 
-### 2. Serve the legacy games directly
+### 2. Serve the game runtimes directly
 
 If you only want the original game runtimes without the Next.js shell around them, serve `public/` as static files:
 
@@ -104,6 +128,7 @@ For auth-enabled static serving, `npm run sync-public-auth-config` generates `pu
 - `src/app` - Next.js routes and route-level styling
 - `src/components` - account, profile, leaderboard, admin, onboarding, and game shell UI
 - `src/lib` - shared client and server helpers
+- `supabase` - Supabase migrations, fresh-start SQL bundle, and edge functions
 - `public/legacy` - shipped Virtual Fisher runtime
 - `public/farmer-legacy` - shipped Virtual Farmer runtime
 - `virtual-fisher` - working source copy for Fisher
@@ -111,6 +136,6 @@ For auth-enabled static serving, `npm run sync-public-auth-config` generates `pu
 
 ## Notes
 
-- This repo intentionally keeps the legacy game runtimes alongside the newer Next.js shell.
-- The website is easiest to verify by running it locally and clicking through the main routes.
+- This repo intentionally keeps the shipped Fisher and Farmer runtimes alongside the Next.js platform shell.
+- The website is easiest to verify by running it locally and clicking through `/home`, `/account-center`, `/fish`, and `/farm`.
 - `npm run lint` is the main lightweight validation command available at the root right now.

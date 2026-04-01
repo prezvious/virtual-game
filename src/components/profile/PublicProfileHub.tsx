@@ -94,7 +94,7 @@ export default function PublicProfileHub() {
         </p>
 
         <div className={styles.guestActions}>
-          <Link href="/home" className={styles.btnPrimary}>Sign In For Account Tools</Link>
+          <Link href="/account-center" className={styles.btnPrimary}>Open Account Center</Link>
           <Link href="/leaderboard" className={styles.btnGhost}>Leaderboard</Link>
         </div>
       </section>

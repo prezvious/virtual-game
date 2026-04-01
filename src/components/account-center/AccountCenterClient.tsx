@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import styles from "./platform-hub.module.css";
+import styles from "./account-center.module.css";
 
 type BridgeProjectState = {
   project: "fisher" | "farmer";
@@ -143,24 +143,24 @@ async function ensureBridgeScript(): Promise<PlatformAccountBridge> {
 
 function statusText(state: BridgeSessionState | null) {
   if (!state || !state.isSignedIn) {
-    return "Signed out. Use your account to continue.";
+    return "Signed out. Use the account center to connect your platform identity.";
   }
 
   if (state.isFullyLinked) {
     return "Account linked across Virtual Fisher and Virtual Farmer.";
   }
 
-  return "Signed in with partial link. Use Create Account to complete linking.";
+  return "Signed in with a partial link. Finish setup to connect both game accounts.";
 }
 
-export default function PlatformHubClient() {
+export default function AccountCenterClient() {
   const [bridge, setBridge] = useState<PlatformAccountBridge | null>(null);
   const [sessionState, setSessionState] = useState<BridgeSessionState | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Loading unified account status...");
+  const [statusMessage, setStatusMessage] = useState("Loading shared account status...");
   const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
 
   const refreshState = useCallback(
@@ -214,11 +214,7 @@ export default function PlatformHubClient() {
       setStatusMessage(mode === "signup" ? "Creating account..." : "Signing in...");
 
       try {
-        const payload = {
-          email,
-          password,
-        };
-
+        const payload = { email, password };
         const result = mode === "signup" ? await bridge.signUp(payload) : await bridge.signIn(payload);
 
         if (!result.ok) {
@@ -275,18 +271,23 @@ export default function PlatformHubClient() {
     <div className={styles.shell}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.kicker}>Platform Home</p>
-          <h1>Unified Game Console</h1>
+          <p className={styles.kicker}>Account Center</p>
+          <h1>Manage the shared account layer behind both game worlds.</h1>
           <p>
-            One account operation now authenticates both Virtual Fisher and Virtual Farmer while keeping
-            each game&apos;s save model untouched. Global username setup now lives on your profile page.
+            Sign in once, check linking status, and move into Virtual Fisher or Virtual Farmer without
+            leaving the same platform shell.
           </p>
         </div>
         <div className={styles.heroActions}>
-          <Link href="/" className={styles.btnGhost}>
-            Landing Page
+          <Link href="/home" className={styles.btnGhost}>
+            Return Home
           </Link>
-          <button type="button" className={styles.btnGhost} onClick={() => void refreshState()} disabled={!bridge || isBusy}>
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={() => void refreshState()}
+            disabled={!bridge || isBusy}
+          >
             Refresh Status
           </button>
         </div>
@@ -295,7 +296,7 @@ export default function PlatformHubClient() {
       <div className={styles.grid}>
         <section className={styles.accountSection}>
           <div className={styles.accountHead}>
-            <p className={styles.sectionLabel}>Account Center</p>
+            <p className={styles.sectionLabel}>Account Status</p>
             <p className={styles.accountEmail}>{accountLabel}</p>
           </div>
 
@@ -306,7 +307,7 @@ export default function PlatformHubClient() {
               onClick={() => setMode("login")}
               disabled={isBusy}
             >
-              Login
+              Log In
             </button>
             <button
               type="button"
@@ -374,13 +375,10 @@ export default function PlatformHubClient() {
           <article className={styles.gameSection}>
             <p className={styles.sectionLabel}>Game Launch</p>
             <h2>Virtual Fisher</h2>
-            <p>Skill-based fishing loop with cloud saves and live leaderboard competition.</p>
+            <p>Jump straight into the fishing runtime after your account state is ready.</p>
             <div className={styles.sectionActions}>
               <Link href="/fish" className={styles.btnPrimary}>
-                Launch Game
-              </Link>
-              <Link href="/leaderboard" className={styles.btnGhost}>
-                Leaderboard
+                Launch Fisher
               </Link>
             </div>
           </article>
@@ -388,13 +386,10 @@ export default function PlatformHubClient() {
           <article className={styles.gameSection}>
             <p className={styles.sectionLabel}>Game Launch</p>
             <h2>Virtual Farmer</h2>
-            <p>Prestige-focused farming progression with cloud sync and leaderboard tracking.</p>
+            <p>Keep farming progression connected to the same platform identity and profile layer.</p>
             <div className={styles.sectionActions}>
               <Link href="/farm" className={styles.btnPrimary}>
-                Launch Game
-              </Link>
-              <Link href="/leaderboard" className={styles.btnGhost}>
-                Leaderboard
+                Launch Farmer
               </Link>
             </div>
           </article>
@@ -402,7 +397,7 @@ export default function PlatformHubClient() {
 
         <section className={styles.accountSection}>
           <div className={styles.accountHead}>
-            <p className={styles.sectionLabel}>Platform Features</p>
+            <p className={styles.sectionLabel}>Account Tools</p>
           </div>
           <div className={styles.sectionActions}>
             <Link href="/profile" className={styles.btnGhost}>Profiles</Link>

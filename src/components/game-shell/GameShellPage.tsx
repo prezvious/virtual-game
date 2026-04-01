@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import styles from "./legacy-iframe-page.module.css";
+import styles from "./game-shell-page.module.css";
 
-type LegacyIframePageProps = {
+type GameShellPageProps = {
   title: string;
   iframeSrc: string;
   iframeTitle: string;
@@ -12,13 +12,13 @@ type LegacyIframePageProps = {
   alternateLabel: string;
 };
 
-export default function LegacyIframePage({
+export default function GameShellPage({
   title,
   iframeSrc,
   iframeTitle,
   alternateHref,
   alternateLabel,
-}: LegacyIframePageProps) {
+}: GameShellPageProps) {
   const [isFrameReady, setIsFrameReady] = useState(false);
 
   useEffect(() => {
@@ -34,19 +34,25 @@ export default function LegacyIframePage({
   return (
     <main className={styles.page}>
       <header className={styles.topbar}>
-        <p>{title}</p>
+        <div className={styles.titleBlock}>
+          <p className={styles.kicker}>Virtual Harvest Runtime</p>
+          <p className={styles.title}>{title}</p>
+        </div>
         <div className={styles.actions}>
           <Link href="/home" className={styles.btnGhost}>
-            Platform Home
+            Home
           </Link>
-          <Link href={alternateHref} className={styles.btnGhost}>
+          <Link href="/account-center" className={styles.btnGhost}>
+            Account Center
+          </Link>
+          <Link href={alternateHref} className={styles.btnPrimary}>
             {alternateLabel}
           </Link>
         </div>
       </header>
 
       <div className={`${styles.frameWrap} ${isFrameReady ? styles.frameWrapReady : ""}`}>
-        {!isFrameReady ? <div className={styles.loadingMask}>Loading runtime...</div> : null}
+        {!isFrameReady ? <div className={styles.loadingMask}>Preparing runtime...</div> : null}
         <iframe
           key={iframeSrc}
           src={iframeSrc}

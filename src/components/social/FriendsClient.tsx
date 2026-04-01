@@ -126,8 +126,8 @@ export default function FriendsClient() {
       </section>
 
       <section className={styles.navSection}>
-        <Link href="/home" className={styles.btnGhost}>Platform Home</Link>
-        <Link href="/leaderboard" className={styles.btnGhost}>Leaderboard</Link>
+        <Link href="/home" className={styles.btnGhost}>Home</Link>
+        <Link href="/account-center" className={styles.btnGhost}>Account Center</Link>
       </section>
     </div>
   );

@@ -133,7 +133,7 @@ export default function ProfileClient({ username }: Props) {
         <div className={styles.errorCard}>
           <h2>Profile not found</h2>
           <p>{error || "This user does not exist."}</p>
-          <Link href="/home" className={styles.btnPrimary}>Back to Home</Link>
+          <Link href="/home" className={styles.btnPrimary}>Return Home</Link>
         </div>
       </div>
     );
@@ -215,7 +215,7 @@ export default function ProfileClient({ username }: Props) {
       )}
 
       <section className={styles.navSection}>
-        <Link href="/home" className={styles.btnGhost}>Platform Home</Link>
+        <Link href="/home" className={styles.btnGhost}>Home</Link>
         <Link href="/leaderboard" className={styles.btnGhost}>Leaderboard</Link>
         <Link href="/friends" className={styles.btnGhost}>Friends</Link>
         {isOwn ? <Link href="/profile" className={styles.btnGhost}>Account Profile</Link> : null}

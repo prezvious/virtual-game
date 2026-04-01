@@ -106,7 +106,7 @@ export default function AdminClient() {
     } finally {
       setActionBusy(false);
     }
-  }, [actionType, targetUserId, itemId, quantity, amount, weatherCondition, weatherIntensity, banReason, getToken, fetchTab]);
+  }, [actionType, targetUserId, itemId, quantity, amount, weatherCondition, weatherIntensity, weatherGame, banReason, getToken, fetchTab]);
 
   if (checking) return <div className={styles.shell}><p>Checking permissions...</p></div>;
   if (!isAdmin) return (
@@ -114,7 +114,7 @@ export default function AdminClient() {
       <div className={styles.forbidden}>
         <h2>Access Denied</h2>
         <p>You do not have admin privileges.</p>
-        <Link href="/home" className={styles.btnPrimary}>Back to Home</Link>
+        <Link href="/home" className={styles.btnPrimary}>Return Home</Link>
       </div>
     </div>
   );
@@ -139,7 +139,7 @@ export default function AdminClient() {
         ))}
       </nav>
 
-      {tabError && <p className={styles.actionMsg} style={{ color: "#ef4444" }}>{tabError}</p>}
+      {tabError && <p className={`${styles.actionMsg} ${styles.errorText}`}>{tabError}</p>}
 
       {tab === "users" && (
         <section className={styles.section}>

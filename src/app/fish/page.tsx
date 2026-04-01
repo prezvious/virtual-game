@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import LegacyIframePage from "@/components/game-shell/LegacyIframePage";
+import GameShellPage from "@/components/game-shell/GameShellPage";
 
 export const metadata: Metadata = {
-  title: "Play | Fish It!",
-  description: "Play Fish It! Enhanced Edition in the Next.js client route.",
+  title: "Virtual Fisher",
+  description: "Launch Virtual Fisher inside the Virtual Harvest shell.",
 };
 
 export default function FishPage() {
   return (
-    <LegacyIframePage
+    <GameShellPage
       title="Virtual Fisher"
       iframeSrc="/legacy/index.html"
       iframeTitle="Virtual Fisher"
       alternateHref="/farm"
-      alternateLabel="Open Farmer"
+      alternateLabel="Open Virtual Farmer"
     />
   );
 }

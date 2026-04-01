@@ -4,7 +4,7 @@
   z-index: 9999;
   display: grid;
   place-items: center;
-  background: rgba(7, 17, 38, 0.7);
+  background: rgba(15, 45, 21, 0.36);
   backdrop-filter: blur(6px);
   animation: fadeIn 300ms ease;
 }
@@ -16,11 +16,15 @@
 .card {
   position: relative;
   width: min(520px, 92vw);
-  background: linear-gradient(135deg, #fef9f0, #edf6fb);
-  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(194, 210, 186, 0.28), transparent 32%),
+    radial-gradient(circle at right, rgba(240, 223, 203, 0.24), transparent 24%),
+    linear-gradient(145deg, rgba(251, 250, 246, 0.96), rgba(241, 239, 233, 0.96));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-muted);
   padding: clamp(1.5rem, 4vw, 2.5rem);
-  color: #172034;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
   animation: slideUp 400ms ease;
 }
 
@@ -30,10 +34,10 @@
   right: 0.8rem;
   width: 32px;
   height: 32px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06);
-  color: #3f5072;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: rgba(251, 250, 246, 0.74);
+  color: var(--text-secondary);
   font-size: 1rem;
   cursor: pointer;
   display: grid;
@@ -42,7 +46,7 @@
 }
 
 .skipBtn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--action-secondary-hover);
 }
 
 .stepIndicator {
@@ -55,40 +59,40 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(194, 210, 186, 0.46);
   transition: all 200ms ease;
 }
 
 .dotActive {
   width: 24px;
-  background: linear-gradient(118deg, #f6c07c, #eba863);
+  background: var(--action-primary);
 }
 
 .dotDone {
-  background: #22c55e;
+  background: var(--sage-300);
 }
 
 .stepTitle {
   margin: 0 0 0.5rem;
+  font-family: var(--font-display), Georgia, serif;
   font-size: clamp(1.3rem, 3vw, 1.7rem);
-  font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .stepBody {
   margin: 0 0 0.6rem;
-  color: #3f5072;
+  color: var(--text-secondary);
   line-height: 1.6;
   font-size: 1rem;
 }
 
 .stepTip {
   margin: 0 0 1.2rem;
-  padding: 0.6rem 0.8rem;
-  background: rgba(34, 211, 238, 0.08);
-  border-left: 3px solid #22d3ee;
-  border-radius: 4px;
-  color: #1d4368;
+  padding: 0.75rem 0.85rem;
+  background: rgba(194, 210, 186, 0.2);
+  border-left: 3px solid var(--sage-300);
+  border-radius: 8px;
+  color: var(--text-secondary);
   font-size: 0.88rem;
   line-height: 1.5;
 }
@@ -102,7 +106,7 @@
 
 .btnPrimary,
 .btnGhost {
-  border-radius: 8px;
+  border-radius: 999px;
   border: 1px solid transparent;
   padding: 0.55rem 1rem;
   font-weight: 800;
@@ -117,21 +121,21 @@
 }
 
 .btnPrimary {
-  background: linear-gradient(118deg, #f6c07c, #eba863);
-  border-color: #d2924e;
-  color: #1b2c49;
+  background: var(--action-primary);
+  border-color: var(--action-primary);
+  color: var(--action-primary-text);
 }
 
 .btnGhost {
-  background: transparent;
-  border-color: rgba(30, 46, 82, 0.18);
-  color: #223757;
+  background: var(--action-secondary);
+  border-color: var(--border-muted);
+  color: var(--action-secondary-text);
 }
 
 .skipText {
   background: none;
   border: none;
-  color: #5a6e8f;
+  color: var(--text-muted);
   font-size: 0.82rem;
   cursor: pointer;
   text-decoration: underline;
@@ -140,7 +144,7 @@
 }
 
 .skipText:hover {
-  color: #3f5072;
+  color: var(--text-secondary);
 }
 
 @keyframes fadeIn {

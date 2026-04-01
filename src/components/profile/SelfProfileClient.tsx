@@ -382,7 +382,7 @@ export default function SelfProfileClient() {
         <div className={styles.sectionHeader}>
           <div>
             <h2 className={styles.sectionTitle}>Security</h2>
-            <p className={styles.sectionHint}>Sign-out remains centralized on Platform Home.</p>
+            <p className={styles.sectionHint}>Sign-out remains centralized in the account center.</p>
           </div>
         </div>
 
@@ -437,7 +437,8 @@ export default function SelfProfileClient() {
       )}
 
       <section className={styles.navSection}>
-        <Link href="/home" className={styles.btnGhost}>Platform Home</Link>
+        <Link href="/home" className={styles.btnGhost}>Home</Link>
+        <Link href="/account-center" className={styles.btnGhost}>Account Center</Link>
         <Link href="/leaderboard" className={styles.btnGhost}>Leaderboard</Link>
         <Link href="/friends" className={styles.btnGhost}>Friends</Link>
         {profile.username ? <Link href={`/profile/${profile.username}`} className={styles.btnGhost}>Public Profile</Link> : null}

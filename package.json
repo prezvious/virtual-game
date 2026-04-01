@@ -1,8 +1,9 @@
 {
-  "name": "virtual-fisher-next",
+  "name": "virtual-harvest-platform",
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build-supabase-baseline": "node scripts/build-supabase-baseline.mjs",
     "sync-public-auth-config": "node scripts/sync-public-auth-config.mjs",
     "predev": "npm run sync-public-auth-config",
     "dev": "next dev",

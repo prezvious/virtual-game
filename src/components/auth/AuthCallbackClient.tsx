@@ -102,13 +102,13 @@ export default function AuthCallbackClient() {
         setReady(true);
         setStatus(
           applied
-            ? "Session verified. Redirecting to the main page..."
-            : "Token processed. Continue to the app and log in if required.",
+            ? "Session verified. Redirecting to the account center..."
+            : "Token processed. Continue to the account center and log in if required.",
         );
 
         if (applied) {
           window.setTimeout(() => {
-            router.replace("/home");
+            router.replace("/account-center");
           }, 1200);
         }
       } catch (error) {
@@ -138,11 +138,11 @@ export default function AuthCallbackClient() {
         <p className="callback-status">{status}</p>
         {ready ? (
           <div className="app-nav">
-            <Link className="app-btn" href="/home">
-              Go To Platform Home
+            <Link className="app-btn" href="/account-center">
+              Open Account Center
             </Link>
             <Link className="app-btn secondary" href="/fish">
-              Launch Game
+              Launch Virtual Fisher
             </Link>
           </div>
         ) : null}

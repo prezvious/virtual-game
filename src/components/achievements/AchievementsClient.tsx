@@ -20,12 +20,14 @@ type Achievement = {
   unlocked_at: string | null;
 };
 
-const RARITY_COLORS: Record<string, string> = {
-  common: "#6b7280", uncommon: "#22c55e", rare: "#3b82f6", epic: "#a855f7", legendary: "#f59e0b",
+const RARITY_THEME: Record<string, { color: string; background: string }> = {
+  common: { color: "var(--text-muted)", background: "rgba(194, 210, 186, 0.16)" },
+  uncommon: { color: "var(--sage-300)", background: "rgba(194, 210, 186, 0.22)" },
+  rare: { color: "var(--olive-500)", background: "rgba(142, 169, 103, 0.18)" },
+  epic: { color: "var(--olive-700)", background: "rgba(119, 136, 54, 0.18)" },
+  legendary: { color: "var(--apricot-500)", background: "rgba(240, 223, 203, 0.82)" },
 };
-const RARITY_BG: Record<string, string> = {
-  common: "rgba(107,114,128,0.08)", uncommon: "rgba(34,197,94,0.08)", rare: "rgba(59,130,246,0.08)", epic: "rgba(168,85,247,0.08)", legendary: "rgba(245,158,11,0.08)",
-};
+
 const CATEGORIES = ["all", "fishing", "exploration", "dedication", "social", "economy", "collection", "meta"];
 
 export default function AchievementsClient() {
@@ -47,28 +49,40 @@ export default function AchievementsClient() {
         setLoading(false);
       }
     };
+
     void load();
   }, []);
 
-  const filtered = filter === "all" ? achievements : achievements.filter((a) => a.category === filter);
-  const unlockedCount = achievements.filter((a) => a.unlocked).length;
-  const totalXp = achievements.filter((a) => a.unlocked).reduce((sum, a) => sum + a.xp_reward, 0);
+  const filtered = filter === "all" ? achievements : achievements.filter((achievement) => achievement.category === filter);
+  const unlockedCount = achievements.filter((achievement) => achievement.unlocked).length;
+  const totalXp = achievements
+    .filter((achievement) => achievement.unlocked)
+    .reduce((sum, achievement) => sum + achievement.xp_reward, 0);
 
   return (
     <div className={styles.shell}>
       <section className={styles.header}>
         <h1 className={styles.title}>Achievements</h1>
-        <p className={styles.subtitle}>{unlockedCount} / {achievements.length} unlocked — {totalXp.toLocaleString()} XP earned</p>
+        <p className={styles.subtitle}>
+          {unlockedCount} / {achievements.length} unlocked - {totalXp.toLocaleString()} XP earned
+        </p>
       </section>
 
       <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: achievements.length > 0 ? `${(unlockedCount / achievements.length) * 100}%` : "0%" }} />
+        <div
+          className={styles.progressFill}
+          style={{ width: achievements.length > 0 ? `${(unlockedCount / achievements.length) * 100}%` : "0%" }}
+        />
       </div>
 
       <nav className={styles.filters}>
-        {CATEGORIES.map((cat) => (
-          <button key={cat} className={`${styles.filterBtn} ${filter === cat ? styles.filterActive : ""}`} onClick={() => setFilter(cat)}>
-            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+        {CATEGORIES.map((category) => (
+          <button
+            key={category}
+            className={`${styles.filterBtn} ${filter === category ? styles.filterActive : ""}`}
+            onClick={() => setFilter(category)}
+          >
+            {category.charAt(0).toUpperCase() + category.slice(1)}
           </button>
         ))}
       </nav>
@@ -79,28 +93,46 @@ export default function AchievementsClient() {
         ) : filtered.length === 0 ? (
           <p className={styles.emptyMsg}>No achievements in this category.</p>
         ) : (
-          filtered.map((a) => (
-            <article key={a.id} className={`${styles.card} ${a.unlocked ? styles.cardUnlocked : styles.cardLocked}`}
-              style={{ borderColor: RARITY_COLORS[a.rarity], background: a.unlocked ? RARITY_BG[a.rarity] : "rgba(0,0,0,0.02)" }}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardIcon} style={{ color: RARITY_COLORS[a.rarity] }}>{a.unlocked ? "★" : "☆"}</span>
-                <div>
-                  <h3 className={styles.cardName}>{a.name}</h3>
-                  <span className={styles.cardRarity} style={{ color: RARITY_COLORS[a.rarity] }}>{a.rarity.toUpperCase()}</span>
+          filtered.map((achievement) => {
+            const rarityTheme = RARITY_THEME[achievement.rarity] || RARITY_THEME.common;
+
+            return (
+              <article
+                key={achievement.id}
+                className={`${styles.card} ${achievement.unlocked ? styles.cardUnlocked : styles.cardLocked}`}
+                style={{
+                  borderColor: rarityTheme.color,
+                  background: achievement.unlocked ? rarityTheme.background : "var(--bg-surface)",
+                }}
+              >
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardIcon} style={{ color: rarityTheme.color }}>
+                    {achievement.unlocked ? "★" : "☆"}
+                  </span>
+                  <div>
+                    <h3 className={styles.cardName}>{achievement.name}</h3>
+                    <span className={styles.cardRarity} style={{ color: rarityTheme.color }}>
+                      {achievement.rarity.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <p className={styles.cardDesc}>{a.description}</p>
-              <div className={styles.cardFooter}>
-                <span className={styles.cardXp}>+{a.xp_reward} XP</span>
-                {a.unlocked && a.unlocked_at && <span className={styles.cardDate}>{new Date(a.unlocked_at).toLocaleDateString("en-US")}</span>}
-              </div>
-            </article>
-          ))
+                <p className={styles.cardDesc}>{achievement.description}</p>
+                <div className={styles.cardFooter}>
+                  <span className={styles.cardXp}>+{achievement.xp_reward} XP</span>
+                  {achievement.unlocked && achievement.unlocked_at && (
+                    <span className={styles.cardDate}>
+                      {new Date(achievement.unlocked_at).toLocaleDateString("en-US")}
+                    </span>
+                  )}
+                </div>
+              </article>
+            );
+          })
         )}
       </section>
 
       <section className={styles.navSection}>
-        <Link href="/home" className={styles.btnGhost}>Platform Home</Link>
+        <Link href="/home" className={styles.btnGhost}>Home</Link>
         <Link href="/profile" className={styles.btnGhost}>Profiles</Link>
       </section>
     </div>

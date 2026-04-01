@@ -1,6 +1,8 @@
 ﻿begin;
 
 create table if not exists public.profiles (
+    -- This legacy file is kept only for isolated Virtual Farmer setups.
+    -- The full platform bootstrap now lives at `supabase/virtual_harvest_fresh_setup.sql`.
     user_id uuid primary key references auth.users (id) on delete cascade,
     display_name text not null,
     created_at timestamptz not null default now(),

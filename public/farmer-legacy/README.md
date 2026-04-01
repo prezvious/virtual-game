@@ -40,12 +40,14 @@ Then open `http://localhost:8080/game.html`.
 ## Supabase Setup
 
 1. Create a Supabase project.
-2. Run `supabase/001_progress_schema.sql` in Supabase SQL Editor.
+2. For the full Virtual Harvest platform, run `supabase/virtual_harvest_fresh_setup.sql` from the project root in Supabase SQL Editor.
 3. Generate `/runtime-supabase-config.js` from the root project with `npm run sync-public-auth-config`.
 4. Make sure your root `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` env values are set before generating.
 5. `supabase/config.js` will read the generated runtime config automatically.
 6. Enable Email auth provider in Supabase Auth.
 7. If email confirmation is enabled, verify the email before first login.
+
+Use `supabase/001_progress_schema.sql` only for isolated legacy Virtual Farmer experiments. It is not the current full-platform bootstrap path.
 
 ## Save and Sync Behavior
 
@@ -78,4 +80,4 @@ Compared with `virtual-farmer/`:
 - `ui.js`: rendering, tabs/modals, leaderboard UI, auth state display
 - `auth.js`: login/signup validation and auth form flow
 - `supabase/client.js`: Supabase wrapper and cloud operations
-- `supabase/001_progress_schema.sql`: schema, triggers, RLS, leaderboard view
+- `supabase/001_progress_schema.sql`: legacy farmer-only schema reference
