@@ -192,6 +192,7 @@
             this._startServerWeatherPolling();
             this._initVisibilityHandler();
             this._initKeyboardShortcuts();
+            this._initJournalHotkeyPopover();
 
             // Auto-resume auto-fish if it was enabled before reload
             if (this.state.autoFishEnabled) {
@@ -921,6 +922,86 @@
             if (!target) return false;
             target.click();
             return true;
+        }
+
+        _initJournalHotkeyPopover() {
+            const menu = document.querySelector('.journal-hotkey-menu');
+            if (!menu) return;
+            const list = menu.querySelector('.journal-hotkey-list');
+            if (!list) return;
+
+            this._journalHotkeyMenu = menu;
+            this._journalHotkeyList = list;
+
+            const syncPlacement = () => {
+                this._syncJournalHotkeyPopoverPlacement();
+            };
+
+            this._journalHotkeySyncPlacement = syncPlacement;
+            menu.addEventListener('toggle', () => {
+                requestAnimationFrame(syncPlacement);
+            });
+
+            this._journalHotkeyResizeHandler = () => {
+                if (!this._journalHotkeyMenu?.open) return;
+                this._syncJournalHotkeyPopoverPlacement();
+            };
+
+            this._journalHotkeyScrollHandler = () => {
+                if (!this._journalHotkeyMenu?.open) return;
+                this._syncJournalHotkeyPopoverPlacement();
+            };
+
+            window.addEventListener('resize', this._journalHotkeyResizeHandler, { passive: true });
+            window.addEventListener('scroll', this._journalHotkeyScrollHandler, { passive: true });
+
+            this._syncJournalHotkeyPopoverPlacement();
+        }
+
+        _syncJournalHotkeyPopoverPlacement() {
+            const menu = this._journalHotkeyMenu || document.querySelector('.journal-hotkey-menu');
+            if (!menu) return;
+            const list = this._journalHotkeyList || menu.querySelector('.journal-hotkey-list');
+            if (!list) return;
+
+            this._journalHotkeyMenu = menu;
+            this._journalHotkeyList = list;
+
+            list.classList.remove('journal-hotkey-list--left', 'journal-hotkey-list--clamped');
+            list.style.removeProperty('--journal-hotkey-shift');
+            list.style.removeProperty('--journal-hotkey-max-inline-size');
+
+            if (!menu.open) return;
+
+            const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const safePadding = 12;
+            const maxInline = Math.max(180, viewportWidth - (safePadding * 2));
+            list.style.setProperty('--journal-hotkey-max-inline-size', `${Math.round(maxInline)}px`);
+
+            let rect = list.getBoundingClientRect();
+            if (rect.right > viewportWidth - safePadding) {
+                list.classList.add('journal-hotkey-list--left');
+                rect = list.getBoundingClientRect();
+            }
+
+            const overflowsLeft = rect.left < safePadding;
+            const overflowsRight = rect.right > viewportWidth - safePadding;
+            if (overflowsLeft || overflowsRight) {
+                list.classList.add('journal-hotkey-list--clamped');
+                rect = list.getBoundingClientRect();
+
+                let shift = 0;
+                if (rect.left < safePadding) {
+                    shift += safePadding - rect.left;
+                }
+                if (rect.right > viewportWidth - safePadding) {
+                    shift -= rect.right - (viewportWidth - safePadding);
+                }
+
+                if (Math.abs(shift) > 0.5) {
+                    list.style.setProperty('--journal-hotkey-shift', `${Math.round(shift)}px`);
+                }
+            }
         }
 
         _initKeyboardShortcuts() {

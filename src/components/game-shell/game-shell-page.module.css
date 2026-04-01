@@ -11,10 +11,10 @@
 
 .pageFisher {
   background:
-    radial-gradient(circle at 12% 10%, rgba(95, 179, 190, 0.22), transparent 24%),
-    radial-gradient(circle at 88% 8%, rgba(191, 219, 226, 0.12), transparent 22%),
-    radial-gradient(circle at 50% 120%, rgba(19, 60, 72, 0.44), transparent 44%),
-    linear-gradient(180deg, #08131a 0%, #0c1d26 38%, #102831 100%);
+    radial-gradient(circle at 12% 10%, rgba(95, 179, 190, 0.18), transparent 24%),
+    radial-gradient(circle at 88% 8%, rgba(191, 219, 226, 0.24), transparent 22%),
+    radial-gradient(circle at 50% 120%, rgba(201, 232, 238, 0.42), transparent 44%),
+    linear-gradient(180deg, #f7fcff 0%, #eef6fb 40%, #e8f1f8 100%);
 }
 
 .topbar {
@@ -30,13 +30,13 @@
 }
 
 .topbarFisher {
-  border-color: rgba(167, 213, 219, 0.18);
+  border-color: rgba(120, 157, 177, 0.24);
   background:
-    linear-gradient(135deg, rgba(10, 28, 37, 0.88), rgba(15, 39, 49, 0.78)),
-    rgba(10, 28, 37, 0.82);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(242, 249, 253, 0.92)),
+    rgba(247, 252, 255, 0.92);
   box-shadow:
-    0 18px 44px rgba(2, 11, 16, 0.38),
-    inset 0 1px 0 rgba(223, 245, 247, 0.06);
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(18px);
 }
 
@@ -55,7 +55,7 @@
 }
 
 .topbarFisher .kicker {
-  color: rgba(197, 224, 228, 0.72);
+  color: rgba(49, 82, 103, 0.74);
 }
 
 .title {
@@ -65,7 +65,7 @@
 }
 
 .topbarFisher .title {
-  color: #ecf8fa;
+  color: #102132;
 }
 
 .actions {
@@ -109,13 +109,13 @@
 }
 
 .topbarFisher .btnGhost {
-  background: rgba(232, 246, 248, 0.06);
-  border-color: rgba(185, 221, 226, 0.16);
-  color: rgba(232, 246, 248, 0.88);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(116, 153, 174, 0.28);
+  color: #133148;
 }
 
 .topbarFisher .btnGhost:hover {
-  background: rgba(232, 246, 248, 0.12);
+  background: rgba(240, 248, 252, 0.98);
 }
 
 .btnPrimary {
@@ -129,15 +129,15 @@
 }
 
 .btnGhostMuted {
-  background: rgba(232, 246, 248, 0.04);
-  border-color: rgba(185, 221, 226, 0.1);
-  color: rgba(197, 224, 228, 0.76);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(116, 153, 174, 0.24);
+  color: #355065;
 }
 
 .btnGhostMuted:hover {
-  background: rgba(232, 246, 248, 0.08);
-  border-color: rgba(185, 221, 226, 0.18);
-  color: rgba(232, 246, 248, 0.9);
+  background: rgba(240, 248, 252, 0.98);
+  border-color: rgba(116, 153, 174, 0.34);
+  color: #203f56;
 }
 
 .frameWrap {
@@ -152,13 +152,13 @@
 }
 
 .frameWrapFisher {
-  border-color: rgba(167, 213, 219, 0.18);
+  border-color: rgba(120, 157, 177, 0.22);
   background:
-    radial-gradient(circle at 14% 12%, rgba(89, 170, 182, 0.18), transparent 20%),
-    linear-gradient(180deg, rgba(8, 22, 29, 0.92), rgba(9, 26, 35, 0.98));
+    radial-gradient(circle at 14% 12%, rgba(123, 198, 208, 0.2), transparent 22%),
+    linear-gradient(180deg, rgba(248, 253, 255, 0.98), rgba(239, 248, 252, 0.98));
   box-shadow:
-    0 24px 60px rgba(2, 11, 16, 0.4),
-    inset 0 1px 0 rgba(223, 245, 247, 0.04);
+    0 24px 60px rgba(15, 23, 42, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .loadingMask {
@@ -176,10 +176,10 @@
 
 .frameWrapFisher .loadingMask {
   background:
-    radial-gradient(circle at 14% 12%, rgba(98, 181, 191, 0.2), transparent 22%),
-    radial-gradient(circle at 82% 10%, rgba(185, 221, 226, 0.11), transparent 24%),
-    radial-gradient(circle at 50% 120%, rgba(7, 23, 30, 0.56), transparent 44%),
-    linear-gradient(180deg, rgba(7, 20, 26, 0.98), rgba(12, 31, 39, 0.98));
+    radial-gradient(circle at 14% 12%, rgba(123, 198, 208, 0.22), transparent 24%),
+    radial-gradient(circle at 82% 10%, rgba(186, 221, 228, 0.2), transparent 26%),
+    radial-gradient(circle at 50% 120%, rgba(209, 231, 239, 0.55), transparent 44%),
+    linear-gradient(180deg, rgba(245, 252, 255, 0.98), rgba(234, 245, 251, 0.98));
 }
 
 .loadingPanel {
@@ -195,13 +195,13 @@
 }
 
 .frameWrapFisher .loadingPanel {
-  border-color: rgba(177, 221, 226, 0.16);
+  border-color: rgba(120, 157, 177, 0.22);
   background:
-    linear-gradient(180deg, rgba(12, 35, 44, 0.92), rgba(10, 29, 36, 0.92)),
-    rgba(10, 29, 36, 0.88);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 250, 254, 0.94)),
+    rgba(247, 252, 255, 0.92);
   box-shadow:
-    0 26px 60px rgba(0, 8, 12, 0.46),
-    inset 0 1px 0 rgba(223, 245, 247, 0.05);
+    0 26px 60px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .loadingKicker,
@@ -219,7 +219,7 @@
 }
 
 .frameWrapFisher .loadingKicker {
-  color: rgba(187, 220, 224, 0.68);
+  color: rgba(49, 82, 103, 0.72);
 }
 
 .loadingTitle {
@@ -230,7 +230,7 @@
 }
 
 .frameWrapFisher .loadingTitle {
-  color: #f3fcfd;
+  color: #102132;
 }
 
 .loadingText {
@@ -239,7 +239,97 @@
 }
 
 .frameWrapFisher .loadingText {
-  color: rgba(220, 238, 240, 0.82);
+  color: #355065;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pageFisher {
+    background:
+      radial-gradient(circle at 12% 10%, rgba(95, 179, 190, 0.22), transparent 24%),
+      radial-gradient(circle at 88% 8%, rgba(191, 219, 226, 0.12), transparent 22%),
+      radial-gradient(circle at 50% 120%, rgba(19, 60, 72, 0.44), transparent 44%),
+      linear-gradient(180deg, #08131a 0%, #0c1d26 38%, #102831 100%);
+  }
+
+  .topbarFisher {
+    border-color: rgba(167, 213, 219, 0.18);
+    background:
+      linear-gradient(135deg, rgba(10, 28, 37, 0.88), rgba(15, 39, 49, 0.78)),
+      rgba(10, 28, 37, 0.82);
+    box-shadow:
+      0 18px 44px rgba(2, 11, 16, 0.38),
+      inset 0 1px 0 rgba(223, 245, 247, 0.06);
+  }
+
+  .topbarFisher .kicker {
+    color: rgba(197, 224, 228, 0.72);
+  }
+
+  .topbarFisher .title {
+    color: #ecf8fa;
+  }
+
+  .topbarFisher .btnGhost {
+    background: rgba(232, 246, 248, 0.06);
+    border-color: rgba(185, 221, 226, 0.16);
+    color: rgba(232, 246, 248, 0.88);
+  }
+
+  .topbarFisher .btnGhost:hover {
+    background: rgba(232, 246, 248, 0.12);
+  }
+
+  .topbarFisher .btnGhostMuted {
+    background: rgba(232, 246, 248, 0.04);
+    border-color: rgba(185, 221, 226, 0.1);
+    color: rgba(197, 224, 228, 0.76);
+  }
+
+  .topbarFisher .btnGhostMuted:hover {
+    background: rgba(232, 246, 248, 0.08);
+    border-color: rgba(185, 221, 226, 0.18);
+    color: rgba(232, 246, 248, 0.9);
+  }
+
+  .frameWrapFisher {
+    border-color: rgba(167, 213, 219, 0.18);
+    background:
+      radial-gradient(circle at 14% 12%, rgba(89, 170, 182, 0.18), transparent 20%),
+      linear-gradient(180deg, rgba(8, 22, 29, 0.92), rgba(9, 26, 35, 0.98));
+    box-shadow:
+      0 24px 60px rgba(2, 11, 16, 0.4),
+      inset 0 1px 0 rgba(223, 245, 247, 0.04);
+  }
+
+  .frameWrapFisher .loadingMask {
+    background:
+      radial-gradient(circle at 14% 12%, rgba(98, 181, 191, 0.2), transparent 22%),
+      radial-gradient(circle at 82% 10%, rgba(185, 221, 226, 0.11), transparent 24%),
+      radial-gradient(circle at 50% 120%, rgba(7, 23, 30, 0.56), transparent 44%),
+      linear-gradient(180deg, rgba(7, 20, 26, 0.98), rgba(12, 31, 39, 0.98));
+  }
+
+  .frameWrapFisher .loadingPanel {
+    border-color: rgba(177, 221, 226, 0.16);
+    background:
+      linear-gradient(180deg, rgba(12, 35, 44, 0.92), rgba(10, 29, 36, 0.92)),
+      rgba(10, 29, 36, 0.88);
+    box-shadow:
+      0 26px 60px rgba(0, 8, 12, 0.46),
+      inset 0 1px 0 rgba(223, 245, 247, 0.05);
+  }
+
+  .frameWrapFisher .loadingKicker {
+    color: rgba(187, 220, 224, 0.68);
+  }
+
+  .frameWrapFisher .loadingTitle {
+    color: #f3fcfd;
+  }
+
+  .frameWrapFisher .loadingText {
+    color: rgba(220, 238, 240, 0.82);
+  }
 }
 
 .frame {
