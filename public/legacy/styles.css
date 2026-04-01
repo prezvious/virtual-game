@@ -3823,6 +3823,11 @@ body {
     line-height: 1.45;
 }
 
+.status-message-content {
+    display: inline-block;
+    max-width: 100%;
+}
+
 .last-catch-display {
     display: block;
     white-space: normal;

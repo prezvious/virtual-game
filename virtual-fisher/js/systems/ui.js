@@ -676,7 +676,7 @@ class UI {
         const el = document.getElementById('status-message');
         if (!el) return;
 
-        el.textContent = String(msg ?? '');
+        this._setStatusContent(el, String(msg ?? ''));
         this._applyStatusTone(el, type);
     }
 
@@ -684,7 +684,7 @@ class UI {
         const el = document.getElementById('status-message');
         if (!el) return;
 
-        el.replaceChildren(this._renderInlineParts(parts));
+        this._setStatusContent(el, this._renderInlineParts(parts));
         this._applyStatusTone(el, type);
     }
 
@@ -761,6 +761,21 @@ class UI {
         });
 
         return fragment;
+    }
+
+    _setStatusContent(el, content) {
+        if (!el) return;
+
+        const wrapper = document.createElement('span');
+        wrapper.className = 'status-message-content';
+
+        if (content instanceof Node) {
+            wrapper.appendChild(content);
+        } else {
+            wrapper.textContent = String(content ?? '');
+        }
+
+        el.replaceChildren(wrapper);
     }
 
     _applyStatusTone(el, type = 'normal') {
