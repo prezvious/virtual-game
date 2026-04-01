@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -42,7 +41,6 @@ export default function RootLayout({
         <a href="#main-content" className="skipLink">
           Skip to content
         </a>
-        <Script src="/runtime-supabase-config.js" strategy="beforeInteractive" />
         {children}
         <Analytics />
       </body>

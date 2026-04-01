@@ -49,6 +49,7 @@ declare global {
 }
 
 const BRIDGE_SRC = "/platform-account-bridge.js";
+const RUNTIME_CONFIG_SRC = "/runtime-supabase-config.js";
 const SUPABASE_VENDOR_SRC = "/vendor/supabase/supabase.js";
 
 type StatusTone = "neutral" | "success" | "error";
@@ -104,7 +105,49 @@ function ensureSupabaseScript(): Promise<void> {
   });
 }
 
+function hasRuntimeConfig() {
+  return typeof (window as Window & { __PLATFORM_SUPABASE_CONFIG__?: unknown }).__PLATFORM_SUPABASE_CONFIG__ === "object";
+}
+
+function ensureRuntimeConfigScript(): Promise<void> {
+  if (hasRuntimeConfig()) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const currentScript = document.querySelector(`script[src="${RUNTIME_CONFIG_SRC}"]`) as
+      | HTMLScriptElement
+      | null;
+
+    if (currentScript) {
+      currentScript.addEventListener("load", () => {
+        if (hasRuntimeConfig()) {
+          resolve();
+          return;
+        }
+        reject(new Error("Runtime auth config loaded without platform settings."));
+      });
+      currentScript.addEventListener("error", () => reject(new Error("Runtime auth config failed to load.")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = RUNTIME_CONFIG_SRC;
+    script.async = true;
+    script.onload = () => {
+      if (hasRuntimeConfig()) {
+        resolve();
+        return;
+      }
+      reject(new Error("Runtime auth config loaded without platform settings."));
+    };
+    script.onerror = () => reject(new Error("Runtime auth config failed to load."));
+    document.head.appendChild(script);
+  });
+}
+
 async function ensureBridgeScript(): Promise<PlatformAccountBridge> {
+  await ensureRuntimeConfigScript();
   await ensureSupabaseScript();
 
   const existing = window.PlatformAccountBridge;

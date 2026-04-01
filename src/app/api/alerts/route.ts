@@ -76,6 +76,18 @@ function getAlertsEdgeKey(): string {
   );
 }
 
+function unavailableAlertResponse(reason: string, error: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      skipped: true,
+      reason,
+      error,
+    },
+    { status: 202 },
+  );
+}
+
 export async function POST(req: NextRequest) {
   const ip = getRequestIp(req);
   const ipRate = consumeRateLimit({
@@ -121,9 +133,9 @@ export async function POST(req: NextRequest) {
 
   if (!edgeKey) {
     console.error("[alerts] missing key for edge forwarding");
-    return NextResponse.json(
-      { ok: false, error: "Server is not configured to forward alerts." },
-      { status: 500 },
+    return unavailableAlertResponse(
+      "alert_forwarding_not_configured",
+      "Server is not configured to forward alerts.",
     );
   }
 
@@ -148,6 +160,25 @@ export async function POST(req: NextRequest) {
 
     const upstreamText = await upstream.text();
     if (!upstream.ok) {
+      const upstreamLower = upstreamText.toLowerCase();
+
+      if (
+        upstream.status === 404 ||
+        upstreamLower.includes("function not found") ||
+        upstreamLower.includes("not found")
+      ) {
+        console.warn("[alerts] send-alert function unavailable", {
+          ip,
+          status: upstream.status,
+          body: upstreamText.slice(0, 500),
+        });
+
+        return unavailableAlertResponse(
+          "alert_function_unavailable",
+          "Alert forwarding unavailable. Deploy the send-alert function or set SUPABASE_SEND_ALERT_URL.",
+        );
+      }
+
       console.warn("[alerts] upstream failed", {
         ip,
         status: upstream.status,
@@ -180,4 +211,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
-

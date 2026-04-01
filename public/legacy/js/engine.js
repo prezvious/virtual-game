@@ -935,8 +935,9 @@
                         || active.isContentEditable);
                 if (isEditable) return;
 
-                const key = event.key.toLowerCase();
-                const code = event.code;
+                const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+                const code = typeof event.code === 'string' ? event.code : '';
+                if (!key && !code) return;
                 const keyMap = this.state.settings?.keyMap || this._defaultKeyMap();
                 const isBound = (action) => keyMap[action] === code;
 
@@ -3336,7 +3337,6 @@
     setTimeout(finalizeBoot, 3500);
 
 })(); // End IIFE
-
 
 
 

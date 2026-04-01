@@ -58,6 +58,9 @@ const CloudSystem = {
     alertCooldownMs: 45000,
     alertMaxPayloadChars: 1800,
     recentAlertSignatures: {},
+    alertEndpointDisabled: false,
+    alertEndpointDisabledReason: '',
+    alertEndpointDisabledLogged: false,
     passwordUiBound: false,
     passwordRulesMinLength: 8,
     playtimeGameKey: 'fisher',
@@ -372,7 +375,25 @@ const CloudSystem = {
         return true;
     },
 
+    _disableAlertEndpoint: function (reason = 'unavailable') {
+        this.alertEndpointDisabled = true;
+        this.alertEndpointDisabledReason = String(reason || 'unavailable');
+
+        if (!this.alertEndpointDisabledLogged) {
+            this.alertEndpointDisabledLogged = true;
+            console.warn('Alert endpoint disabled for this session:', this.alertEndpointDisabledReason);
+        }
+    },
+
     _postAlertToEdge: async function (alertBody) {
+        if (this.alertEndpointDisabled) {
+            return {
+                ok: false,
+                skipped: true,
+                reason: this.alertEndpointDisabledReason || 'unavailable'
+            };
+        }
+
         const response = await fetch(ALERT_FUNCTION_URL, {
             method: 'POST',
             headers: {
@@ -381,16 +402,43 @@ const CloudSystem = {
             body: JSON.stringify(alertBody)
         });
 
+        const text = await response.text();
+        let parsed = null;
+        if (text) {
+            try {
+                parsed = JSON.parse(text);
+            } catch (_err) {
+                parsed = null;
+            }
+        }
+
         if (!response.ok) {
-            const text = await response.text();
+            const errorText = String(parsed?.error || text || 'Unknown error');
+            const lowered = errorText.toLowerCase();
+            const shouldDisableForSession = response.status === 404
+                || lowered.includes('function not found')
+                || lowered.includes('not configured')
+                || lowered.includes('alert delivery failed (404)');
+
+            if (shouldDisableForSession) {
+                const reason = String(parsed?.reason || 'alert_endpoint_unavailable');
+                this._disableAlertEndpoint(reason);
+                return {
+                    ok: false,
+                    skipped: true,
+                    reason,
+                    message: errorText
+                };
+            }
+
             throw new Error(`Alert endpoint failed (${response.status}): ${text || 'Unknown error'}`);
         }
 
-        try {
-            return await response.json();
-        } catch (_err) {
-            return { ok: true };
+        if (parsed && parsed.skipped) {
+            this._disableAlertEndpoint(parsed.reason || 'alert_endpoint_unavailable');
         }
+
+        return parsed || { ok: true };
     },
 
     reportAlert: async function (payload = {}) {
@@ -430,7 +478,9 @@ const CloudSystem = {
 
         try {
             const data = await this._postAlertToEdge(alertBody);
-            this._announceAlertDispatch('Alert email request sent successfully.', 'success');
+            if (!data?.skipped) {
+                this._announceAlertDispatch('Alert email request sent successfully.', 'success');
+            }
             return data;
         } catch (err) {
             delete this.recentAlertSignatures[signature];
@@ -455,11 +505,18 @@ const CloudSystem = {
     sendTestErrorAlert: async function () {
         this._announceAlertDispatch('Triggering test error alert email...', 'warning');
         try {
-            await this.reportError({
+            const result = await this.reportError({
                 type: 'JAVASCRIPT_ERROR_TEST',
                 details: 'Manual test alert from AuthAPI.testAlert()',
                 source: 'manual-test'
             });
+            if (result?.skipped) {
+                this._announceAlertDispatch(
+                    result.message || 'Alert delivery is unavailable in this environment.',
+                    'warning'
+                );
+                return false;
+            }
             return true;
         } catch (err) {
             this._announceAlertDispatch(`Test error alert failed: ${err?.message || err}`, 'danger');
