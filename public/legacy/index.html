@@ -10,7 +10,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20260401d" />
+    <link rel="stylesheet" href="styles.css?v=20260401f" />
 </head>
 
 <body class="booting">
@@ -83,34 +83,67 @@
 
         <div class="fishing-zone fishing-zone--idle">
             <section class="action-area">
-                <p class="zone-kicker">Captain's Deck</p>
-                <h3 class="farm-title">Fishing Zone</h3>
-                <p class="farm-description">Work the timing lane when the water shifts, keep your combo alive, and bank steady progress between expeditions.</p>
-
-                <div class="farm-toggle-row">
-                    <button class="auto-fish-btn farm-toggle-btn" id="auto-fish-btn">Enable Auto Fish</button>
-                    <span class="auto-status-pill" id="auto-status-pill">Inactive</span>
-                </div>
-                <div class="status-text" id="status-message">Ready to cast.</div>
-
-                <div class="timing-slot">
-                    <div class="minigame-container" id="minigame-ui">
-                        <div class="target-zone" id="mg-target"></div>
-                        <div class="indicator" id="mg-indicator"></div>
+                <div class="zone-command-row">
+                    <div class="zone-command-copy">
+                        <p class="zone-kicker">Captain's Deck</p>
+                        <h3 class="farm-title">Fishing Zone</h3>
+                        <p class="farm-description">Work the timing lane when the water shifts, keep your combo alive, and bank steady progress between expeditions.</p>
                     </div>
 
-                    <div class="auto-cooldown-container" id="auto-cooldown-container">
-                        <div class="cooldown-label">Auto-Fishing...</div>
-                        <div class="cooldown-bar-track">
-                            <div class="cooldown-bar-fill" id="cooldown-bar-fill"></div>
+                    <div class="zone-command-tools">
+                        <div class="farm-toggle-row">
+                            <button class="auto-fish-btn farm-toggle-btn" id="auto-fish-btn">Enable Auto Fish</button>
+                            <span class="auto-status-pill" id="auto-status-pill">Inactive</span>
+                        </div>
+
+                        <div class="zone-quick-menu" id="zone-quick-menu">
+                            <button class="zone-quick-btn" id="zone-quick-btn" onclick="toggleQuickMenu()" aria-label="More menu" title="More">
+                                <img class="zone-quick-icon" src="icon/more-square.svg" alt="">
+                            </button>
+                            <div class="zone-quick-dropdown" id="zone-quick-dropdown">
+                                <button class="zone-quick-item"
+                                    onclick="GameAPI.openExpeditions(); toggleQuickMenu();" aria-label="Expeditions"
+                                    title="Expeditions">
+                                    <img class="zone-quick-item-icon" src="icon/expeditions.svg" alt="">
+                                </button>
+                                <button class="zone-quick-item"
+                                    onclick="GameAPI.openInventory(); toggleQuickMenu();" aria-label="Inventory" title="Inventory">
+                                    <img class="zone-quick-item-icon" src="icon/inventory.svg" alt="">
+                                </button>
+                                <button class="zone-quick-item"
+                                    onclick="GameAPI.openSettings(); toggleQuickMenu();" aria-label="Settings" title="Settings">
+                                    <img class="zone-quick-item-icon" src="icon/settings.svg" alt="">
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="last-catch-display" id="last-catch"></div>
+                <div class="zone-stage-grid">
+                    <div class="zone-stage-main">
+                        <div class="timing-slot">
+                            <div class="minigame-container" id="minigame-ui">
+                                <div class="target-zone" id="mg-target"></div>
+                                <div class="indicator" id="mg-indicator"></div>
+                            </div>
 
-                <div class="action-buttons">
-                    <button class="btn-primary cast-btn-lg" id="action-btn">Cast Line</button>
+                            <div class="auto-cooldown-container" id="auto-cooldown-container">
+                                <div class="cooldown-label">Auto-Fishing...</div>
+                                <div class="cooldown-bar-track">
+                                    <div class="cooldown-bar-fill" id="cooldown-bar-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn-primary cast-btn-lg" id="action-btn">Cast Line</button>
+                        </div>
+                    </div>
+
+                    <div class="zone-stage-sidebar">
+                        <div class="status-text" id="status-message">Ready to cast.</div>
+                        <div class="last-catch-display" id="last-catch"></div>
+                    </div>
                 </div>
             </section>
 
@@ -158,27 +191,6 @@
                         </article>
                     </div>
                 </section>
-            </div>
-
-            <div class="zone-quick-menu" id="zone-quick-menu">
-                <button class="zone-quick-btn" id="zone-quick-btn" onclick="toggleQuickMenu()" aria-label="More menu" title="More">
-                    <img class="zone-quick-icon" src="icon/more-square.svg" alt="">
-                </button>
-                <div class="zone-quick-dropdown" id="zone-quick-dropdown">
-                    <button class="zone-quick-item"
-                        onclick="GameAPI.openExpeditions(); toggleQuickMenu();" aria-label="Expeditions"
-                        title="Expeditions">
-                        <img class="zone-quick-item-icon" src="icon/expeditions.svg" alt="">
-                    </button>
-                    <button class="zone-quick-item"
-                        onclick="GameAPI.openInventory(); toggleQuickMenu();" aria-label="Inventory" title="Inventory">
-                        <img class="zone-quick-item-icon" src="icon/inventory.svg" alt="">
-                    </button>
-                    <button class="zone-quick-item"
-                        onclick="GameAPI.openSettings(); toggleQuickMenu();" aria-label="Settings" title="Settings">
-                        <img class="zone-quick-item-icon" src="icon/settings.svg" alt="">
-                    </button>
-                </div>
             </div>
         </div>
 
