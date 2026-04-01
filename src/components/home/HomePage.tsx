@@ -52,7 +52,7 @@ const highlights = [
 
 export default function HomePage() {
   return (
-    <main className={styles.page}>
+    <main id="main-content" tabIndex={-1} className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.topbar}>
           <div className={styles.brandBlock}>

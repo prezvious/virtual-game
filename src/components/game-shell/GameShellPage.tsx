@@ -10,6 +10,7 @@ type GameShellPageProps = {
   iframeTitle: string;
   alternateHref: string;
   alternateLabel: string;
+  variant?: "default" | "fisher";
 };
 
 export default function GameShellPage({
@@ -18,24 +19,43 @@ export default function GameShellPage({
   iframeTitle,
   alternateHref,
   alternateLabel,
+  variant = "default",
 }: GameShellPageProps) {
   const [isFrameReady, setIsFrameReady] = useState(false);
+  const [isSlowLoad, setIsSlowLoad] = useState(false);
 
   useEffect(() => {
-    const revealTimeout = window.setTimeout(() => {
-      setIsFrameReady(true);
-    }, 4500);
+    if (isFrameReady) {
+      return;
+    }
+
+    const slowLoadTimeout = window.setTimeout(() => {
+      setIsSlowLoad(true);
+    }, 1200);
 
     return () => {
-      window.clearTimeout(revealTimeout);
+      window.clearTimeout(slowLoadTimeout);
     };
-  }, []);
+  }, [isFrameReady]);
+
+  const isFisherVariant = variant === "fisher";
+  const pageClassName = `${styles.page} ${isFisherVariant ? styles.pageFisher : ""}`;
+  const topbarClassName = `${styles.topbar} ${isFisherVariant ? styles.topbarFisher : ""}`;
+  const frameWrapClassName = `${styles.frameWrap} ${isFrameReady ? styles.frameWrapReady : ""} ${
+    isFisherVariant ? styles.frameWrapFisher : ""
+  }`;
+  const alternateActionClassName = isFisherVariant ? styles.btnGhostMuted : styles.btnPrimary;
+  const loadingEyebrow = isFisherVariant ? "Virtual Fisher" : "Virtual Harvest Runtime";
+  const loadingTitle = isFisherVariant ? "Opening Virtual Fisher\u2026" : "Preparing runtime\u2026";
+  const loadingMessage = isSlowLoad
+    ? "Still loading the game. This can take a moment on slower connections."
+    : "Syncing the shell and preparing your session.";
 
   return (
-    <main className={styles.page}>
-      <header className={styles.topbar}>
+    <main id="main-content" tabIndex={-1} className={pageClassName}>
+      <header className={topbarClassName}>
         <div className={styles.titleBlock}>
-          <p className={styles.kicker}>Virtual Harvest Runtime</p>
+          <p className={styles.kicker}>{loadingEyebrow}</p>
           <p className={styles.title}>{title}</p>
         </div>
         <div className={styles.actions}>
@@ -45,14 +65,22 @@ export default function GameShellPage({
           <Link href="/account-center" className={styles.btnGhost}>
             Account Center
           </Link>
-          <Link href={alternateHref} className={styles.btnPrimary}>
+          <Link href={alternateHref} className={alternateActionClassName}>
             {alternateLabel}
           </Link>
         </div>
       </header>
 
-      <div className={`${styles.frameWrap} ${isFrameReady ? styles.frameWrapReady : ""}`}>
-        {!isFrameReady ? <div className={styles.loadingMask}>Preparing runtime...</div> : null}
+      <div className={frameWrapClassName}>
+        {!isFrameReady ? (
+          <div className={styles.loadingMask} role="status" aria-live="polite">
+            <div className={styles.loadingPanel}>
+              <p className={styles.loadingKicker}>{loadingEyebrow}</p>
+              <p className={styles.loadingTitle}>{loadingTitle}</p>
+              <p className={styles.loadingText}>{loadingMessage}</p>
+            </div>
+          </div>
+        ) : null}
         <iframe
           key={iframeSrc}
           src={iframeSrc}

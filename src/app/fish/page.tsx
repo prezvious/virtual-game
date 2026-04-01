@@ -14,6 +14,7 @@ export default function FishPage() {
       iframeTitle="Virtual Fisher"
       alternateHref="/farm"
       alternateLabel="Open Virtual Farmer"
+      variant="fisher"
     />
   );
 }

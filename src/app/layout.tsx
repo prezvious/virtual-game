@@ -39,6 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
+        <a href="#main-content" className="skipLink">
+          Skip to content
+        </a>
         <Script src="/runtime-supabase-config.js" strategy="beforeInteractive" />
         {children}
         <Analytics />

@@ -1124,7 +1124,7 @@ const CloudSystem = {
 
         this.updateUI();
 
-        const buttonsToDisable = ['action-btn', 'auto-fish-btn', 'btn-login', 'btn-login-text', 'btn-signup'];
+        const buttonsToDisable = ['action-btn', 'auto-fish-btn', 'btn-login', 'btn-signup'];
         buttonsToDisable.forEach((id) => {
             const btn = document.getElementById(id);
             if (!btn) return;
@@ -1197,19 +1197,19 @@ const CloudSystem = {
 
     updateUI: function () {
         const btnAccount = document.getElementById('btn-login');
-        const btnLogin = document.getElementById('btn-login-text');
+        const accountStack = btnAccount ? btnAccount.closest('.hero-account-stack') : null;
         const btnSignup = document.getElementById('btn-signup');
         const status = document.getElementById('user-status');
         const accountStatus = document.getElementById('account-cloud-status');
         const statusText = this._getCloudStatusText();
 
         if (this.user) {
+            if (accountStack) accountStack.style.display = 'flex';
             if (btnAccount) btnAccount.style.display = 'inline-flex';
-            if (btnLogin) btnLogin.style.display = 'none';
             if (btnSignup) btnSignup.style.display = 'none';
         } else {
+            if (accountStack) accountStack.style.display = 'none';
             if (btnAccount) btnAccount.style.display = 'none';
-            if (btnLogin) btnLogin.style.display = 'inline-flex';
             if (btnSignup) btnSignup.style.display = 'none';
             this.closeAccountModal();
         }

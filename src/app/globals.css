@@ -82,6 +82,25 @@ select {
   outline-offset: 2px;
 }
 
+.skipLink {
+  position: fixed;
+  top: 0.9rem;
+  left: 0.9rem;
+  z-index: 1000;
+  padding: 0.72rem 0.9rem;
+  border-radius: 999px;
+  background: var(--forest-800);
+  color: var(--cream-50);
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(15, 45, 21, 0.22);
+  transform: translateY(-160%);
+  transition: transform 160ms ease;
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+}
+
 .app-shell {
   width: min(1080px, 94vw);
   margin: 1.6rem auto;

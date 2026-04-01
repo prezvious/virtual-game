@@ -22,7 +22,8 @@
             <div class="hero-left-stack">
                 <div class="hero-brand">
                     <p class="eyebrow">Enhanced Edition</p>
-                    <h1>Fish It!</h1>
+                    <h1>Virtual Fisher</h1>
+                    <p class="hero-summary">Read the weather, hold the line, and turn each quiet cast into a cleaner run.</p>
                 </div>
                 <div class="hero-actions-row">
                     <div class="hero-actions">
@@ -49,7 +50,6 @@
                     <button class="btn-secondary hero-account-btn hero-account-icon-btn" id="btn-login" onclick="AuthAPI.login()" aria-label="Account Info" title="Account Info">
                         <img class="hero-account-icon" src="icon/profile.svg" alt="">
                     </button>
-                    <button class="btn-primary hero-account-btn hero-account-guest-btn" id="btn-login-text" onclick="AuthAPI.login()">Starts here</button>
                 </div>
             </div>
         </div>
@@ -83,7 +83,9 @@
 
         <div class="fishing-zone fishing-zone--idle">
             <section class="action-area">
+                <p class="zone-kicker">Captain's Deck</p>
                 <h3 class="farm-title">Fishing Zone</h3>
+                <p class="farm-description">Work the timing lane when the water shifts, keep your combo alive, and bank steady progress between expeditions.</p>
 
                 <div class="farm-toggle-row">
                     <button class="auto-fish-btn farm-toggle-btn" id="auto-fish-btn">Enable Auto Fish</button>
@@ -123,7 +125,7 @@
 
             <div class="results-panel-stack">
                 <section class="farm-results" id="auto-results-panel" aria-label="Auto fish results">
-                    <h3>Auto Fish Results</h3>
+                    <h3>Auto Run Summary</h3>
                     <div class="farm-results-grid">
                         <article class="farm-result-card">
                             <p class="farm-result-value" id="auto-result-catches">0</p>
@@ -145,7 +147,7 @@
                 </section>
 
                 <section class="farm-results" id="manual-results-panel" aria-label="Manual fishing results">
-                    <h3>Results</h3>
+                    <h3>Recent Manual Run</h3>
                     <div class="farm-results-grid">
                         <article class="farm-result-card">
                             <p class="farm-result-value" id="manual-result-catches">0</p>
@@ -191,7 +193,7 @@
 
         <section class="panel leaderboard-panel" aria-label="Global leaderboards">
             <div class="leaderboard-head">
-                <h2>Leaderboard</h2>
+                <h2>Open Water Leaderboard</h2>
                 <p class="panel-note" id="leaderboard-meta">Refreshes every 20 minutes.</p>
             </div>
             <div class="leaderboard-grid">
@@ -209,7 +211,7 @@
 
         <section class="panel">
             <div class="journal-header">
-                <h2>Journal</h2>
+                <h2>Captain's Journal</h2>
                 <details class="journal-hotkey-menu">
                     <summary aria-label="Open hotkeys menu" title="Hotkeys"></summary>
                     <div class="journal-hotkey-list">
