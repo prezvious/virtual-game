@@ -124,6 +124,25 @@ export default function SelfProfileClient() {
     };
   }, [loadProfile]);
 
+  useEffect(() => {
+    const handleFocus = () => {
+      void loadProfile();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadProfile();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadProfile]);
+
   const patchProfile = useCallback(async (payload: Record<string, unknown>) => {
     const token = await getSessionToken();
     if (!token) {

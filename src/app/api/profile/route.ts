@@ -15,6 +15,20 @@ type PlaytimeRow = {
   last_played_at: string | null;
 };
 
+type CanonicalGameKey = "fisher" | "farmer";
+
+const GAME_KEY_ALIASES: Record<string, CanonicalGameKey> = {
+  fisher: "fisher",
+  "virtual-fisher": "fisher",
+  virtual_fisher: "fisher",
+  virtualfisher: "fisher",
+  fishit: "fisher",
+  farmer: "farmer",
+  "virtual-farmer": "farmer",
+  virtual_farmer: "farmer",
+  virtualfarmer: "farmer",
+};
+
 function wantsSelfProfile(req: NextRequest) {
   const scope = req.nextUrl.searchParams.get("scope");
   const username = req.nextUrl.searchParams.get("username");
@@ -47,6 +61,11 @@ function normalizeSeconds(value: number | string | null | undefined) {
     return 0;
   }
   return Math.floor(numericValue);
+}
+
+function normalizeGameKey(value: string | null | undefined): CanonicalGameKey | null {
+  const normalized = String(value || "").trim().toLowerCase();
+  return GAME_KEY_ALIASES[normalized] || null;
 }
 
 function normalizeAchievementRows(rows: unknown[]) {
@@ -134,12 +153,20 @@ async function loadSelfProfile(serviceClient: ReturnType<typeof createServiceSup
 
   const achievements = normalizeAchievementRows((achievementsResult.data || []) as unknown[]);
   const playtimeRows = (playtimeResult.data || []) as PlaytimeRow[];
-  const playtimeByGame = new Map(
-    playtimeRows.map((row) => [String(row.game_key || ""), normalizeSeconds(row.playtime_seconds)]),
-  );
+  let fisherSeconds = 0;
+  let farmerSeconds = 0;
 
-  const fisherSeconds = playtimeByGame.get('fisher') || 0;
-  const farmerSeconds = playtimeByGame.get('farmer') || 0;
+  playtimeRows.forEach((row) => {
+    const normalizedKey = normalizeGameKey(row.game_key);
+    const seconds = normalizeSeconds(row.playtime_seconds);
+
+    if (normalizedKey === "fisher") {
+      fisherSeconds += seconds;
+    } else if (normalizedKey === "farmer") {
+      farmerSeconds += seconds;
+    }
+  });
+
   const lastPlayedAtMs = playtimeRows
     .map((row) => Date.parse(String(row.last_played_at || "")))
     .filter((value) => Number.isFinite(value))
