@@ -3037,6 +3037,8 @@ body.theme-dark .biome-atlas-identity {
     --bg-mesh-color: rgba(228, 248, 250, 0.08);
     --bg-vein-color: rgba(121, 176, 186, 0.08);
     --hero-control-height: 3rem;
+    --fisher-quick-icon-filter: brightness(0) saturate(100%) invert(88%) sepia(13%) saturate(489%) hue-rotate(149deg) brightness(101%) contrast(93%);
+    --fisher-quick-icon-filter-active: brightness(0) saturate(100%) invert(81%) sepia(34%) saturate(519%) hue-rotate(150deg) brightness(102%) contrast(96%);
 }
 
 body.theme-light {
@@ -3466,6 +3468,58 @@ body {
 
 .zone-quick-btn:not(:disabled):hover {
     background: rgba(228, 247, 249, 0.12);
+}
+
+.zone-quick-menu.open .zone-quick-btn {
+    border-color: rgba(176, 218, 223, 0.18);
+    background: rgba(228, 247, 249, 0.12);
+    box-shadow: inset 0 1px 0 rgba(237, 252, 253, 0.04);
+}
+
+.zone-quick-dropdown {
+    gap: 0.3rem;
+    padding: 0.4rem;
+    border-radius: 18px;
+    border-color: rgba(176, 218, 223, 0.16);
+    background:
+        linear-gradient(180deg, rgba(13, 37, 46, 0.96), rgba(9, 28, 35, 0.96)),
+        rgba(9, 28, 35, 0.96);
+    box-shadow:
+        0 18px 36px rgba(0, 8, 12, 0.28),
+        inset 0 1px 0 rgba(237, 252, 253, 0.04);
+}
+
+.zone-quick-btn,
+.zone-quick-item {
+    color: rgba(212, 236, 240, 0.86);
+}
+
+.zone-quick-item {
+    width: 100%;
+    min-width: 3rem;
+    min-height: 3rem;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: rgba(228, 247, 249, 0.02);
+}
+
+.zone-quick-icon,
+.zone-quick-item-icon {
+    filter: var(--fisher-quick-icon-filter) !important;
+    opacity: 0.92;
+}
+
+.zone-quick-item:not(:disabled):hover {
+    background: rgba(98, 199, 213, 0.12);
+    border-color: rgba(176, 218, 223, 0.14);
+    color: #f2fcfd;
+}
+
+.zone-quick-btn:not(:disabled):hover .zone-quick-icon,
+.zone-quick-menu.open .zone-quick-btn .zone-quick-icon,
+.zone-quick-item:not(:disabled):hover .zone-quick-item-icon {
+    filter: var(--fisher-quick-icon-filter-active) !important;
+    opacity: 1;
 }
 
 .panel {
