@@ -423,11 +423,11 @@
 
         el.textContent = message || '';
         if (tone === 'error') {
-            el.style.color = '#b91c1c';
+            el.style.color = 'var(--theme-danger-text)';
         } else if (tone === 'success') {
-            el.style.color = '#166534';
+            el.style.color = 'var(--theme-success-text)';
         } else {
-            el.style.color = '#0f766e';
+            el.style.color = 'var(--theme-info-text)';
         }
     };
 

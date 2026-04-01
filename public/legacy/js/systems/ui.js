@@ -49,46 +49,7 @@ class UI {
             autoStatePill.classList.toggle('active', isAutoActive);
         }
 
-        this.renderRodSignal(rod);
         this.renderSpeciesTracker();
-    }
-
-    renderRodSignal(rod = null) {
-        const container = document.getElementById('rod-signal');
-        const titleEl = document.getElementById('rod-signal-title');
-        const detailEl = document.getElementById('rod-signal-detail');
-        const fillEl = document.getElementById('rod-signal-fill');
-        if (!container || !titleEl || !detailEl || !fillEl) return;
-
-        const currentRod = rod || (RODS.find((entry) => entry.id === this.game.state.rod) || RODS[0]);
-        const passive = currentRod?.passive;
-        if (!passive || passive.mode !== 'measured') {
-            container.hidden = true;
-            container.classList.remove('active');
-            fillEl.style.width = '0%';
-            return;
-        }
-
-        const rodState = (this.game.state && typeof this.game.state.rodState === 'object' && this.game.state.rodState)
-            ? this.game.state.rodState
-            : {};
-        const favorGoal = Number.isFinite(passive.favorGoal) && passive.favorGoal > 0 ? passive.favorGoal : 1;
-        const favor = Number.isFinite(rodState.favor) ? Math.max(0, rodState.favor) : 0;
-        const windowCasts = Number.isFinite(passive.windowCasts) && passive.windowCasts > 0 ? passive.windowCasts : 1;
-        const castsRemaining = Number.isFinite(rodState.windowCastsRemaining) ? Math.max(0, rodState.windowCastsRemaining) : 0;
-        const isActive = castsRemaining > 0;
-
-        container.hidden = false;
-        container.classList.toggle('active', isActive);
-        titleEl.textContent = isActive ? passive.effectLabel || 'Lucky Window' : 'Favor';
-        detailEl.textContent = isActive
-            ? `${castsRemaining} cast${castsRemaining === 1 ? '' : 's'} remaining`
-            : `${Math.min(favor, favorGoal)} / ${favorGoal}`;
-
-        const ratio = isActive
-            ? Math.max(0, Math.min((castsRemaining / windowCasts) * 100, 100))
-            : Math.max(0, Math.min((favor / favorGoal) * 100, 100));
-        fillEl.style.width = `${ratio}%`;
     }
 
     renderSpeciesTracker() {

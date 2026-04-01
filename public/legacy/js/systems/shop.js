@@ -97,7 +97,7 @@ class Shop {
             div.className = `shop-item ${isActive ? 'shop-item-highlight' : ''}`;
             div.innerHTML = `
                 <div class="item-info">
-                    <h3>${weather.icon} ${weather.name}${isActive ? ' <span style="font-size:0.75rem;color:#166534;">Active</span>' : ''}</h3>
+                    <h3>${weather.icon} ${weather.name}${isActive ? ' <span style="font-size:0.75rem;color:var(--theme-success-text);">Active</span>' : ''}</h3>
                     <p class="shop-item-desc">${weather.desc}</p>
                     <p class="shop-item-meta">Luck: x${weather.luck} | Difficulty: x${weather.difficulty_mod}</p>
                 </div>
