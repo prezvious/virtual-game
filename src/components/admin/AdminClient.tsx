@@ -111,6 +111,11 @@ export default function AdminClient() {
   const executeAction = useCallback(async () => {
     setActionBusy(true); setActionMsg("");
     try {
+      if (actionType === "ban_user" && !banReason.trim()) {
+        setActionMsg("Reason required to ban a user.");
+        return;
+      }
+
       const token = await getToken();
       const body: Record<string, unknown> = { action: actionType, target_user_id: targetUserId };
       if (actionType === "spawn_item") { body.item_id = itemId; body.quantity = Number(quantity) || 1; }

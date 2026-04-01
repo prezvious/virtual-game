@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractBannedUntil } from "@/lib/ban";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
 import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
@@ -13,6 +14,8 @@ type AdminBalanceRpcResult = {
   reason?: string;
   coins?: number | string;
 };
+
+const PERMANENT_BAN_DURATION = "876000h";
 
 function forbidden() {
   return NextResponse.json({ ok: false, error: "Forbidden." }, { status: 403 });
@@ -227,8 +230,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "ban_user") {
+      const reason = String(body.reason || "").trim();
       if (!targetId) {
         return NextResponse.json({ ok: false, error: "target_user_id required." }, { status: 400 });
+      }
+
+      if (!reason) {
+        return NextResponse.json({ ok: false, error: "Reason required to ban a user." }, { status: 400 });
       }
 
       if (targetId === adminUser.id) {
@@ -249,13 +257,23 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "Cannot ban another admin." }, { status: 403 });
       }
 
-      const { error: banError } = await supabase.auth.admin.updateUserById(targetId, { ban_duration: "876000h" });
+      const { data: banResult, error: banError } = await supabase.auth.admin.updateUserById(targetId, {
+        ban_duration: PERMANENT_BAN_DURATION,
+      });
       if (banError) {
-        await logAction({ reason: String(body.reason || "Admin action"), error: banError.message });
+        await logAction({ reason, error: banError.message });
         return NextResponse.json({ ok: false, error: banError.message }, { status: 500 });
       }
 
-      await logAction({ reason: String(body.reason || "Admin action") });
+      const bannedUntil = extractBannedUntil(banResult?.user)
+        || extractBannedUntil((await supabase.auth.admin.getUserById(targetId)).data.user);
+
+      await logAction({
+        reason,
+        banned_until: bannedUntil,
+        ban_duration: PERMANENT_BAN_DURATION,
+        source: "admin_console",
+      });
       return NextResponse.json({ ok: true, message: "User banned." });
     }
 

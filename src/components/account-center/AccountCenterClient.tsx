@@ -35,7 +35,7 @@ type BridgeAuthResult = {
   requiresVerification?: boolean;
 };
 
-type PlatformAccountBridge = {
+type AccountBridgeApi = {
   getSessionState: () => Promise<BridgeSessionState>;
   signIn: (payload: { email: string; password: string }) => Promise<BridgeAuthResult>;
   signUp: (payload: { email: string; password: string }) => Promise<BridgeAuthResult>;
@@ -44,7 +44,7 @@ type PlatformAccountBridge = {
 
 declare global {
   interface Window {
-    PlatformAccountBridge?: PlatformAccountBridge;
+    PlatformAccountBridge?: AccountBridgeApi;
   }
 }
 
@@ -146,7 +146,7 @@ function ensureRuntimeConfigScript(): Promise<void> {
   });
 }
 
-async function ensureBridgeScript(): Promise<PlatformAccountBridge> {
+async function ensureBridgeScript(): Promise<AccountBridgeApi> {
   await ensureRuntimeConfigScript();
   await ensureSupabaseScript();
 
@@ -197,7 +197,7 @@ function statusText(state: BridgeSessionState | null) {
 }
 
 export default function AccountCenterClient() {
-  const [bridge, setBridge] = useState<PlatformAccountBridge | null>(null);
+  const [bridge, setBridge] = useState<AccountBridgeApi | null>(null);
   const [sessionState, setSessionState] = useState<BridgeSessionState | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -207,7 +207,7 @@ export default function AccountCenterClient() {
   const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
 
   const refreshState = useCallback(
-    async (targetBridge?: PlatformAccountBridge) => {
+    async (targetBridge?: AccountBridgeApi) => {
       const activeBridge = targetBridge || bridge;
       if (!activeBridge) return;
 

@@ -1,0 +1,114 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(15, 45, 21, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.dialog {
+  position: relative;
+  width: min(540px, 100%);
+  border: 1px solid rgba(166, 91, 71, 0.22);
+  border-radius: var(--radius-lg);
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  background:
+    radial-gradient(circle at top left, rgba(240, 223, 203, 0.3), transparent 34%),
+    radial-gradient(circle at right, rgba(194, 210, 186, 0.18), transparent 28%),
+    linear-gradient(155deg, rgba(251, 250, 246, 0.98), rgba(241, 239, 233, 0.98));
+  box-shadow: 0 28px 64px rgba(15, 45, 21, 0.22);
+}
+
+.closeIcon {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: rgba(251, 250, 246, 0.8);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.closeIcon:hover {
+  background: var(--action-secondary-hover);
+  transform: translateY(-1px);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--status-danger);
+}
+
+.title {
+  margin: 0.8rem 0 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.body {
+  margin: 0.9rem 0 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.reason {
+  margin: 1rem 0 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(166, 91, 71, 0.14);
+  background: rgba(240, 223, 203, 0.34);
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+
+.footer {
+  margin-top: 1.3rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.closeBtn {
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: var(--action-secondary);
+  color: var(--action-secondary-text);
+  font-weight: 800;
+  padding: 0.68rem 1rem;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.closeBtn:hover {
+  transform: translateY(-1px);
+  background: var(--action-secondary-hover);
+}
+
+@media (max-width: 560px) {
+  .dialog {
+    padding-top: 3.4rem;
+  }
+
+  .footer {
+    justify-content: stretch;
+  }
+
+  .closeBtn {
+    width: 100%;
+  }
+}

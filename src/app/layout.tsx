@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import BanGuard from "@/components/auth/BanGuard";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -41,6 +42,7 @@ export default function RootLayout({
         <a href="#main-content" className="skipLink">
           Skip to content
         </a>
+        <BanGuard />
         {children}
         <Analytics />
       </body>
