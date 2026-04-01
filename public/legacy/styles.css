@@ -2385,8 +2385,22 @@ tr:hover td {
 
 .offline-popup p {
     margin: 0.35rem 0;
-    color: var(--text);
+    color: var(--theme-card-text);
     font-size: 0.88rem;
+}
+
+.offline-popup-copy {
+    line-height: 1.6;
+}
+
+.offline-popup-copy strong {
+    color: #f3fcfd;
+}
+
+.offline-popup-meta {
+    color: var(--theme-card-muted) !important;
+    font-size: 0.8rem !important;
+    font-weight: 700;
 }
 
 body.theme-dark .panel-header {

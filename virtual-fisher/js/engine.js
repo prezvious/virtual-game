@@ -2799,8 +2799,8 @@
                 <span>Welcome Back</span>
                 <button class="offline-popup-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
             </div>
-            <p>While you were away <strong>${timeStr}</strong>, you caught <strong>${fishCount}</strong> fish worth <strong>${coins.toLocaleString()}</strong> coins.</p>
-            <p style="font-size:0.8rem;color:#6b7280;">+${xp} XP earned</p>
+            <p class="offline-popup-copy">While you were away <strong>${timeStr}</strong>, you caught <strong>${fishCount}</strong> fish worth <strong>${coins.toLocaleString()}</strong> coins.</p>
+            <p class="offline-popup-meta">+${xp} XP earned</p>
         `;
             document.body.appendChild(popup);
 
