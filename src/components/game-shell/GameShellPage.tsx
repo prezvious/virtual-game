@@ -87,6 +87,7 @@ export default function GameShellPage({
           title={iframeTitle}
           className={styles.frame}
           loading="eager"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
           allow="clipboard-read; clipboard-write"
           onLoad={() => setIsFrameReady(true)}
         />

@@ -377,13 +377,13 @@ function updateShopPage() {
     const insights = document.getElementById('shop-insights');
     if (insights) {
         const bestRoiText = bestRoiHoe
-            ? `<strong>${bestRoiHoe.hoe.name}</strong><span>${formatRoiLabel(bestRoiHoe.roi)}</span>`
+            ? `<strong>${escapeHtml(bestRoiHoe.hoe.name)}</strong><span>${escapeHtml(formatRoiLabel(bestRoiHoe.roi))}</span>`
             : '<strong>All hoes owned</strong><span>No ROI targets left.</span>';
         const cheapestNextText = cheapestNextHoe
-            ? `<strong>${cheapestNextHoe.hoe.name}</strong><span>${formatMoney(cheapestNextHoe.displayCost)}</span>`
+            ? `<strong>${escapeHtml(cheapestNextHoe.hoe.name)}</strong><span>${escapeHtml(formatMoney(cheapestNextHoe.displayCost))}</span>`
             : '<strong>No next upgrade</strong><span>You own every hoe.</span>';
         const bestFertText = mostEfficientFertilizer
-            ? `<strong>${mostEfficientFertilizer.fert.name}</strong><span>Efficiency: +${formatEfficiencyLabel(mostEfficientFertilizer.efficiency)} yield</span>`
+            ? `<strong>${escapeHtml(mostEfficientFertilizer.fert.name)}</strong><span>Efficiency: +${escapeHtml(formatEfficiencyLabel(mostEfficientFertilizer.efficiency))} yield</span>`
             : '<strong>No fertilizer data</strong><span>Unavailable</span>';
 
         insights.innerHTML = `
@@ -410,6 +410,9 @@ function updateShopPage() {
             const { hoe, index, owned, equipped, canBuy, displayCost, deltaMultiplier } = entry;
             const card = document.createElement('div');
             card.className = `item-card${owned ? ' owned' : ''}${equipped ? ' equipped' : ''}`;
+            const safeHoeName = escapeHtml(hoe.name);
+            const safeMultiplier = escapeHtml(formatNumber(hoe.multiplier));
+            const safeDeltaMultiplier = escapeHtml(formatNumber(deltaMultiplier));
 
             let priceHtml;
             if (hoe.cost === 0) {
@@ -428,12 +431,12 @@ function updateShopPage() {
 
             card.innerHTML = `
                 <div class="item-header">
-                    <span class="item-name">${hoe.name}</span>
+                    <span class="item-name">${safeHoeName}</span>
                     <span class="item-price">${priceHtml}</span>
                 </div>
                 ${badges.length ? `<div class="item-badges">${badges.join('')}</div>` : ''}
-                <div class="item-stats">Multiplier: ${formatNumber(hoe.multiplier)}x</div>
-                <div class="item-stats">${owned ? 'Ready to equip.' : `Gain vs equipped: +${formatNumber(deltaMultiplier)}x`}</div>
+                <div class="item-stats">Multiplier: ${safeMultiplier}x</div>
+                <div class="item-stats">${owned ? 'Ready to equip.' : `Gain vs equipped: +${safeDeltaMultiplier}x`}</div>
                 ${owned
                     ? (equipped
                         ? '<button class="btn" disabled>Equipped</button>'
@@ -465,6 +468,11 @@ function updateShopPage() {
 
             const card = document.createElement('div');
             card.className = `item-card${qty > 0 ? ' owned' : ''}`;
+            const safeFertName = escapeHtml(fert.name);
+            const safeCost = escapeHtml(formatMoney(fert.cost));
+            const safeBonus = escapeHtml(formatNumber(fert.bonus));
+            const safeQty = escapeHtml(formatNumber(qty));
+            const safeEfficiency = escapeHtml(formatEfficiencyLabel(efficiency));
 
             const badges = [];
             if (entry.isMostEfficient) badges.push('<span class="item-badge item-badge-eff">Most Efficient</span>');
@@ -472,12 +480,12 @@ function updateShopPage() {
 
             card.innerHTML = `
                 <div class="item-header">
-                    <span class="item-name">${fert.name}</span>
-                    <span class="item-price">${formatMoney(fert.cost)}</span>
+                    <span class="item-name">${safeFertName}</span>
+                    <span class="item-price">${safeCost}</span>
                 </div>
                 ${badges.length ? `<div class="item-badges">${badges.join('')}</div>` : ''}
-                <div class="item-stats">Bonus: +${formatNumber(fert.bonus)} yield | Owned: ${formatNumber(qty)}</div>
-                <div class="item-stats">Efficiency: +${formatEfficiencyLabel(efficiency)} yield</div>
+                <div class="item-stats">Bonus: +${safeBonus} yield | Owned: ${safeQty}</div>
+                <div class="item-stats">Efficiency: +${safeEfficiency} yield</div>
             `;
 
             const actions = document.createElement('div');
@@ -524,20 +532,28 @@ function updateUpgradesPage() {
 
             const card = document.createElement('div');
             card.className = `item-card${maxed ? ' owned' : ''}`;
+            const safeUpgradeName = escapeHtml(upgrade.name);
+            const safeUpgradeDesc = escapeHtml(upgrade.desc);
+            const safeUpgradeLevel = escapeHtml(`${level}/${upgrade.maxLevel}`);
+            const progressWidth = Math.max(0, Math.min(100, (level / upgrade.maxLevel) * 100));
             card.innerHTML = `
                 <div class="item-header">
-                    <span class="item-name">${upgrade.name}</span>
-                    <span class="upgrade-level">Lv. ${level}/${upgrade.maxLevel}</span>
+                    <span class="item-name">${safeUpgradeName}</span>
+                    <span class="upgrade-level">Lv. ${safeUpgradeLevel}</span>
                 </div>
-                <div class="item-stats">${upgrade.desc}</div>
+                <div class="item-stats">${safeUpgradeDesc}</div>
                 <div class="progress-container">
-                    <div class="progress-bar" style="width: ${(level / upgrade.maxLevel) * 100}%"></div>
+                    <div class="progress-bar" style="width: ${progressWidth}%"></div>
                 </div>
                 ${maxed
                     ? '<button class="btn" disabled>Maxed</button>'
-                    : `<button class="btn" ${canBuy ? '' : 'disabled'} onclick="buyUpgrade('${upgrade.id}')">${formatMoney(cost)}</button>`
+                    : `<button class="btn" ${canBuy ? '' : 'disabled'}>${escapeHtml(formatMoney(cost))}</button>`
                 }
             `;
+            const actionBtn = card.querySelector('button');
+            if (actionBtn && !maxed) {
+                actionBtn.addEventListener('click', () => buyUpgrade(upgrade.id));
+            }
             grid.appendChild(card);
         }
     }
@@ -582,8 +598,8 @@ function updateInventoryPage() {
             const div = document.createElement('div');
             div.className = `inventory-item ${item.rarity}`;
             div.innerHTML = `
-                <span>${item.name}</span>
-                <span>${formatNumber(item.quantity)}</span>
+                <span>${escapeHtml(item.name)}</span>
+                <span>${escapeHtml(formatNumber(item.quantity))}</span>
             `;
             grid.appendChild(div);
         }
@@ -614,8 +630,8 @@ function updateStatsPage() {
 
     grid.innerHTML = statItems.map(s => `
         <div class="stats-card">
-            <div class="value">${s.value}</div>
-            <div class="label">${s.label}</div>
+            <div class="value">${escapeHtml(s.value)}</div>
+            <div class="label">${escapeHtml(s.label)}</div>
         </div>
     `).join('');
 }
@@ -631,10 +647,10 @@ function updateAchievementsPage() {
         const isUnlocked = game.achievements.includes(a.id);
         return `
             <div class="achievement-card${isUnlocked ? ' unlocked' : ''}">
-                <div class="achievement-icon">${a.icon}</div>
+                <div class="achievement-icon">${escapeHtml(a.icon)}</div>
                 <div class="achievement-info">
-                    <h3>${a.name}</h3>
-                    <p>${a.desc}</p>
+                    <h3>${escapeHtml(a.name)}</h3>
+                    <p>${escapeHtml(a.desc)}</p>
                 </div>
             </div>
         `;
@@ -767,15 +783,15 @@ function updateAutoFarmStats() {
     if (autoFarmActive) {
         grid.innerHTML = `
             <div class="auto-farm-stat">
-                <div class="af-value">${formatNumber(autoFarmSessionHarvests)}</div>
+                <div class="af-value">${escapeHtml(formatNumber(autoFarmSessionHarvests))}</div>
                 <div class="af-label">Harvests</div>
             </div>
             <div class="auto-farm-stat">
-                <div class="af-value">${formatNumber(autoFarmSessionPlants)}</div>
+                <div class="af-value">${escapeHtml(formatNumber(autoFarmSessionPlants))}</div>
                 <div class="af-label">Plants Earned</div>
             </div>
             <div class="auto-farm-stat">
-                <div class="af-value">${formatNumber(autoFarmSessionXP)}</div>
+                <div class="af-value">${escapeHtml(formatNumber(autoFarmSessionXP))}</div>
                 <div class="af-label">XP Earned</div>
             </div>
             <div class="auto-farm-stat">

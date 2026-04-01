@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 
 type Bucket = {
   count: number;
@@ -66,26 +68,69 @@ export function consumeRateLimit({ key, limit, windowMs }: ConsumeParams): RateL
   };
 }
 
-// Fix H-1: Use x-forwarded-for with validation instead of trusting blindly
-// Fix N-12: Fall back to a stable key instead of random UUID per request
-export function getRequestIp(req: NextRequest): string {
-  // Use x-forwarded-for but validate it looks like an IP
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const [ip] = forwarded.split(",").map((part) => part.trim());
-    // Validate it looks like an IP address (basic check)
-    if (ip && /^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+const TRUSTED_PRODUCTION_IP_HEADERS = [
+  "x-vercel-forwarded-for",
+  "cf-connecting-ip",
+  "fly-client-ip",
+  "x-real-ip",
+];
+
+const TRUSTED_NON_PRODUCTION_IP_HEADERS = [
+  ...TRUSTED_PRODUCTION_IP_HEADERS,
+  "x-forwarded-for",
+];
+
+function normalizeIpCandidate(value: string | null): string | null {
+  if (!value) return null;
+  const candidate = value.split(",")[0]?.trim() || "";
+  return isIP(candidate) ? candidate : null;
+}
+
+function getTrustedRequestIp(req: NextRequest): string | null {
+  const trustedHeaders = process.env.NODE_ENV === "production"
+    ? TRUSTED_PRODUCTION_IP_HEADERS
+    : TRUSTED_NON_PRODUCTION_IP_HEADERS;
+
+  for (const header of trustedHeaders) {
+    const ip = normalizeIpCandidate(req.headers.get(header));
+    if (ip) {
       return ip;
     }
   }
 
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp && /^(?:\d{1,3}\.){3}\d{1,3}$/.test(realIp.trim())) {
-    return realIp.trim();
+  return null;
+}
+
+function createStableFingerprint(parts: string[]) {
+  return createHash("sha256")
+    .update(parts.join("\n"))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function getAnonymousFallbackKey(req: NextRequest) {
+  const host = req.headers.get("host")?.trim().toLowerCase() || "unknown-host";
+  const userAgent = req.headers.get("user-agent")?.trim().toLowerCase() || "unknown-agent";
+  return `fallback:${createStableFingerprint([host, userAgent])}`;
+}
+
+export function getRequestIp(req: NextRequest): string {
+  return getTrustedRequestIp(req) || getAnonymousFallbackKey(req);
+}
+
+export function buildRateLimitKey(
+  scope: string,
+  req: NextRequest,
+  options: {
+    userId?: string | null;
+  } = {},
+): string {
+  const userId = typeof options.userId === "string" ? options.userId.trim() : "";
+  const clientKey = getRequestIp(req);
+
+  if (userId) {
+    return `${scope}:user:${userId}:${clientKey}`;
   }
 
-  // Fix N-12: Use a fallback that doesn't create a unique key per request
-  // Use the host header + a fixed suffix to create a consistent key for unknown IPs
-  const host = req.headers.get("host") || "unknown";
-  return `fallback:${host}`;
+  return `${scope}:${clientKey}`;
 }

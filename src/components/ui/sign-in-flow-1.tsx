@@ -358,6 +358,36 @@ export const SignInPage = ({ className }: SignInPageProps) => {
   const codeInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [initialCanvasVisible, setInitialCanvasVisible] = useState(true);
   const [reverseCanvasVisible, setReverseCanvasVisible] = useState(false);
+  const initialCanvasTimeoutRef = useRef<number | null>(null);
+  const successStepTimeoutRef = useRef<number | null>(null);
+
+  const clearStepTimeouts = () => {
+    if (initialCanvasTimeoutRef.current !== null) {
+      window.clearTimeout(initialCanvasTimeoutRef.current);
+      initialCanvasTimeoutRef.current = null;
+    }
+    if (successStepTimeoutRef.current !== null) {
+      window.clearTimeout(successStepTimeoutRef.current);
+      successStepTimeoutRef.current = null;
+    }
+  };
+
+  const completeCodeStep = () => {
+    if (!code.every((digit) => digit.length === 1)) {
+      return;
+    }
+
+    clearStepTimeouts();
+    setReverseCanvasVisible(true);
+    initialCanvasTimeoutRef.current = window.setTimeout(() => {
+      setInitialCanvasVisible(false);
+      initialCanvasTimeoutRef.current = null;
+    }, 50);
+    successStepTimeoutRef.current = window.setTimeout(() => {
+      setStep("success");
+      successStepTimeoutRef.current = null;
+    }, 2000);
+  };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,6 +399,8 @@ export const SignInPage = ({ className }: SignInPageProps) => {
     const id = setTimeout(() => codeInputRefs.current[0]?.focus(), 500);
     return () => clearTimeout(id);
   }, [step]);
+
+  useEffect(() => () => clearStepTimeouts(), []);
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) return;
@@ -382,13 +414,12 @@ export const SignInPage = ({ className }: SignInPageProps) => {
     }
 
     if (index === 5 && value && newCode.every((digit) => digit.length === 1)) {
-      setReverseCanvasVisible(true);
-      setTimeout(() => setInitialCanvasVisible(false), 50);
-      setTimeout(() => setStep("success"), 2000);
+      completeCodeStep();
     }
   };
 
   const handleBackClick = () => {
+    clearStepTimeouts();
     setStep("email");
     setCode(["", "", "", "", "", ""]);
     setReverseCanvasVisible(false);
@@ -553,6 +584,7 @@ export const SignInPage = ({ className }: SignInPageProps) => {
                         Back
                       </motion.button>
                       <motion.button
+                        onClick={completeCodeStep}
                         className={cn(
                           "flex-1 rounded-full border py-3 font-medium transition-all duration-300",
                           code.every((d) => d !== "")

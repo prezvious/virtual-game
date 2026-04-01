@@ -1,6 +1,6 @@
 export const BAN_NOTICE_STORAGE_KEY = "vh:ban-notice";
 
-const TEN_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 10;
+const NINETY_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 90;
 
 export type BanStatusResponse =
   | {
@@ -37,7 +37,7 @@ export function extractBannedUntil(user: unknown): string | null {
 export function isPermanentBan(bannedUntil: string | null): boolean {
   if (!bannedUntil) return true;
   const bannedAt = Date.parse(bannedUntil);
-  return Number.isFinite(bannedAt) && bannedAt > Date.now() + TEN_YEARS_MS;
+  return Number.isFinite(bannedAt) && bannedAt > Date.now() + NINETY_YEARS_MS;
 }
 
 export function extractAuthErrorCode(error: unknown): string | null {

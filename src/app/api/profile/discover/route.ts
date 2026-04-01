@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 24;
@@ -26,17 +26,20 @@ async function getAuthUser(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // Fix N-13: Rate limit to prevent username enumeration
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `discover:${ip}`, limit: DISCOVER_RATE_LIMIT, windowMs: DISCOVER_WINDOW_MS });
-  if (!rate.allowed) {
-    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
-  }
-
   // Fix C-1: Require authentication to prevent unauthenticated DB enumeration
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  // Fix N-13: Rate limit to prevent username enumeration
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("discover", req, { userId: user.id }),
+    limit: DISCOVER_RATE_LIMIT,
+    windowMs: DISCOVER_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const query = req.nextUrl.searchParams.get("q")?.trim() || "";

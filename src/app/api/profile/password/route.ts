@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { requireSameOriginBrowserRequest } from "@/lib/browser-request";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `pwd:${ip}`, limit: 5, windowMs: 300_000 });
-
-  if (!rate.allowed) {
-    return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+  const sameOriginError = requireSameOriginBrowserRequest(req);
+  if (sameOriginError) {
+    return sameOriginError;
   }
 
   const authHeader = req.headers.get("authorization");
@@ -33,6 +32,16 @@ export async function POST(req: NextRequest) {
   const { data: { user }, error: authError } = await anonClient.auth.getUser(stripBearer(authHeader));
   if (authError || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("pwd", req, { userId: user.id }),
+    limit: 5,
+    windowMs: 300_000,
+  });
+
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
   const { error } = await supabase.auth.admin.updateUserById(user.id, { password: newPassword });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSameOriginBrowserRequest } from "@/lib/browser-request";
 import { getSupabaseConfig } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const ALERT_RATE_LIMIT = 10;
 const ALERT_WINDOW_MS = 60 * 1000;
@@ -71,7 +72,6 @@ function getAlertsEdgeKey(): string {
   return (
     process.env.SUPABASE_FUNCTIONS_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     ""
   );
 }
@@ -89,9 +89,14 @@ function unavailableAlertResponse(reason: string, error: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const sameOriginError = requireSameOriginBrowserRequest(req);
+  if (sameOriginError) {
+    return sameOriginError;
+  }
+
   const ip = getRequestIp(req);
   const ipRate = consumeRateLimit({
-    key: `alerts:ip:${ip}`,
+    key: buildRateLimitKey("alerts:ip", req),
     limit: ALERT_RATE_LIMIT,
     windowMs: ALERT_WINDOW_MS,
   });
@@ -116,7 +121,7 @@ export async function POST(req: NextRequest) {
   }
 
   const signatureRate = consumeRateLimit({
-    key: `alerts:sig:${ip}:${signatureFor(alertBody)}`,
+    key: `${buildRateLimitKey("alerts:sig", req)}:${signatureFor(alertBody)}`,
     limit: ALERT_SIGNATURE_LIMIT,
     windowMs: ALERT_WINDOW_MS,
   });
@@ -208,6 +213,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected alert forwarding error.";
     console.error("[alerts] unexpected failure", { ip, message });
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Unexpected alert forwarding error." }, { status: 500 });
   }
 }

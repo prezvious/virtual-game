@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 import { buildWeatherStateKey, isWeatherGame, toPublicWeatherState } from "@/lib/weather";
 
 export async function GET(req: NextRequest) {
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `weather:${ip}`, limit: 60, windowMs: 60_000 });
+  const rate = consumeRateLimit({ key: buildRateLimitKey("weather", req), limit: 60, windowMs: 60_000 });
   if (!rate.allowed) {
     return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
   }

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSameOriginBrowserRequest } from "@/lib/browser-request";
 import { createAnonServerClient, createServiceSupabaseClient } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 
 const TRACKING_STARTED_ON = "2026-04-01";
 
 // Fix N-15: Username validation regex
-const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
+const USERNAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]{2,19}$/;
 
-// Fix N-14: Rate limiting for profile updates
+const PROFILE_GET_RATE_LIMIT = 30;
+const PROFILE_GET_WINDOW_MS = 60_000;
 const PROFILE_PATCH_RATE_LIMIT = 10;
 const PROFILE_PATCH_WINDOW_MS = 60_000;
 
@@ -227,6 +229,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Username required." }, { status: 400 });
   }
 
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("profile-public-get", req),
+    limit: PROFILE_GET_RATE_LIMIT,
+    windowMs: PROFILE_GET_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const serviceClient = createServiceSupabaseClient();
 
   const { data: profile, error } = await serviceClient
@@ -239,7 +250,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "User not found." }, { status: 404 });
   }
 
-  const [{ count: followersCount, error: followersError }, { count: followingCount, error: followingError }, { data: achievements }] = await Promise.all([
+  const [
+    { count: followersCount, error: followersError },
+    { count: followingCount, error: followingError },
+    { data: achievements, error: achievementsError },
+  ] = await Promise.all([
     serviceClient
       .from("follows")
       .select("*", { count: "exact", head: true })
@@ -256,7 +271,10 @@ export async function GET(req: NextRequest) {
       .limit(6),
   ]);
 
-  // Fix M-3: Use nullish coalescing to handle null counts
+  if (followersError || followingError || achievementsError) {
+    return NextResponse.json({ ok: false, error: "Failed to load public profile." }, { status: 500 });
+  }
+
   return NextResponse.json({
     ok: true,
     profile: {
@@ -269,16 +287,23 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  // Fix N-14: Rate limit profile updates
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `profile-patch:${ip}`, limit: PROFILE_PATCH_RATE_LIMIT, windowMs: PROFILE_PATCH_WINDOW_MS });
-  if (!rate.allowed) {
-    return NextResponse.json({ ok: false, error: "Too many updates. Try again later." }, { status: 429 });
+  const sameOriginError = requireSameOriginBrowserRequest(req);
+  if (sameOriginError) {
+    return sameOriginError;
   }
 
   const auth = await authenticateRequest(req);
   if (!auth.user) {
     return auth.response!;
+  }
+
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("profile-patch", req, { userId: auth.user.id }),
+    limit: PROFILE_PATCH_RATE_LIMIT,
+    windowMs: PROFILE_PATCH_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many updates. Try again later." }, { status: 429 });
   }
 
   let body: Record<string, unknown>;
@@ -299,7 +324,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Username is required." }, { status: 400 });
     }
     if (!USERNAME_REGEX.test(requestedUsername)) {
-      return NextResponse.json({ ok: false, error: "Username must be 3-30 characters, letters, numbers, underscores, or hyphens only." }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Username must be 3-20 characters, start with a letter, and use letters, numbers, or underscores only." }, { status: 400 });
     }
   }
 
@@ -310,43 +335,31 @@ export async function PATCH(req: NextRequest) {
   const serviceClient = createServiceSupabaseClient();
 
   try {
-    await ensureOwnProfileRow(serviceClient, auth.user.id);
+    const { data, error } = await serviceClient.rpc("update_user_profile_atomic", {
+      p_target_user_id: auth.user.id,
+      p_candidate: requestedUsername,
+      p_avatar_url: Object.prototype.hasOwnProperty.call(updates, "avatar_url") ? String(updates.avatar_url) : null,
+      p_bio: Object.prototype.hasOwnProperty.call(updates, "bio") ? String(updates.bio) : null,
+    });
 
-    // Fix M-2: Claim username first, then update other fields - if username claim fails, no partial update
-    if (requestedUsername !== null) {
-      const { data, error } = await serviceClient.rpc("_claim_username_for_user", {
-        target_user_id: auth.user.id,
-        candidate: requestedUsername,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data?.ok) {
-        return NextResponse.json(
-          { ok: false, error: data?.reason || "Could not save username." },
-          { status: 400 },
-        );
-      }
+    if (error) {
+      throw error;
     }
 
-    if (Object.keys(updates).length > 0) {
-      const { error } = await serviceClient
-        .from("user_profiles")
-        .update(updates)
-        .eq("user_id", auth.user.id);
-
-      if (error) {
-        throw error;
-      }
+    const result = data as { ok?: boolean; reason?: string } | null;
+    if (!result?.ok) {
+      return NextResponse.json(
+        { ok: false, error: result?.reason || "Could not update profile." },
+        { status: 400 },
+      );
     }
 
     const profile = await loadSelfProfile(serviceClient, auth.user.id, auth.user.email);
     return NextResponse.json({ ok: true, profile });
   } catch (error) {
+    console.error("[profile PATCH]", error);
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Failed to update profile." },
+      { ok: false, error: "Failed to update profile." },
       { status: 500 },
     );
   }

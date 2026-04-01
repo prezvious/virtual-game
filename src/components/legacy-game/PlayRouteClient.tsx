@@ -8,8 +8,7 @@ export default function PlayRouteClient() {
         title="Virtual Fisher"
         className="play-root"
         loading="eager"
-        // Fix L-5: Add sandbox attribute to restrict iframe capabilities
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
         allow="clipboard-read; clipboard-write"
         style={{
           width: "100%",

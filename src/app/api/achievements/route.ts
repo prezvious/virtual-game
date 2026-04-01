@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnonServerClient, stripBearer } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 
 const ACHIEVEMENTS_RATE_LIMIT = 30;
 const ACHIEVEMENTS_WINDOW_MS = 60_000;
@@ -15,16 +15,19 @@ async function getAuthUser(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `achievements:${ip}`, limit: ACHIEVEMENTS_RATE_LIMIT, windowMs: ACHIEVEMENTS_WINDOW_MS });
-  if (!rate.allowed) {
-    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
-  }
-
   // Fix C-2: Require authentication for user-specific achievement data
   const user = await getAuthUser(req);
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("achievements", req, { userId: user.id }),
+    limit: ACHIEVEMENTS_RATE_LIMIT,
+    windowMs: ACHIEVEMENTS_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const supabase = createAnonServerClient();

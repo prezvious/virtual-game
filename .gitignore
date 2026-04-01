@@ -32,9 +32,11 @@ supabase/*
 supabase/migrations/*
 !supabase/migrations/20260402_admin_account_purge_and_atomic_admin_mutations.sql
 !supabase/migrations/20260402_enable_platform_settings_realtime.sql
+!supabase/migrations/20260402_profile_and_admin_delete_hardening.sql
 /output/
 output/
 public/runtime-supabase-config.js
+NUL
 
 # local tooling (not for public repos)
 .claude/

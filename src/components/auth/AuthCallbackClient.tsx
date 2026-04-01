@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getClientSupabase } from "@/lib/auth-client";
@@ -34,7 +34,7 @@ export default function AuthCallbackClient() {
   const [status, setStatus] = useState("Checking verification token...");
   const [ready, setReady] = useState(false);
   const [success, setSuccess] = useState(false);
-  const supabase = useMemo(() => getClientSupabase(), []);
+  const supabase = getClientSupabase();
 
   useEffect(() => {
     let mounted = true;

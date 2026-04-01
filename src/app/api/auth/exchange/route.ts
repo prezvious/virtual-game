@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createAnonServerClient } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const AUTH_EXCHANGE_RATE_LIMIT = 20;
 const AUTH_EXCHANGE_WINDOW_MS = 5 * 60 * 1000;
@@ -41,7 +41,7 @@ function formatSessionPayload(session: {
 export async function POST(req: NextRequest) {
   const ip = getRequestIp(req);
   const rate = consumeRateLimit({
-    key: `auth-exchange:${ip}`,
+    key: buildRateLimitKey("auth-exchange", req),
     limit: AUTH_EXCHANGE_RATE_LIMIT,
     windowMs: AUTH_EXCHANGE_WINDOW_MS,
   });

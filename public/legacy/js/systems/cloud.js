@@ -43,6 +43,7 @@ const CloudSystem = {
     authHydrated: false,
     hydrating: false,
     hydrateQueue: [],
+    authFallbackTimerId: null,
     loadedCloudUserId: null,
     networkBound: false,
     pendingCloudSync: false,
@@ -102,6 +103,10 @@ const CloudSystem = {
         }
 
         cloudSupabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT' || (session && session.user)) {
+                this._clearAuthFallbackTimer();
+            }
+
             const hasSessionUser = !!(session && session.user);
 
             if (event === 'SIGNED_OUT') {
@@ -121,18 +126,10 @@ const CloudSystem = {
 
             if (hasSessionUser) {
                 const nextUser = session.user;
-                const previousUserId = this.user ? this.user.id : null;
-                await this._enqueueLogin(nextUser);
-                this.authHydrated = true;
-
-                if (event === 'SIGNED_IN') {
-                    this.closeAuthModal();
-                }
-
-                const shouldLoadCloud = this.loadedCloudUserId !== nextUser.id || previousUserId !== nextUser.id;
-                if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && shouldLoadCloud) {
-                    await this.loadFromCloud({ force: true });
-                }
+                await this._hydrateAuthenticatedSession(nextUser, {
+                    closeAuthModal: event === 'SIGNED_IN',
+                    forceCloudLoad: event === 'INITIAL_SESSION' || event === 'SIGNED_IN'
+                });
                 return;
             }
 
@@ -147,36 +144,65 @@ const CloudSystem = {
 
         // Timeout-based fallback: if INITIAL_SESSION hasn't fired within 3s,
         // call getSession() directly, but only if not already hydrated.
-        setTimeout(() => {
-            if (this.authHydrated) return;
-            cloudSupabaseClient.auth.getSession().then(({ data, error }) => {
+        this.authFallbackTimerId = setTimeout(() => {
+            void (async () => {
                 if (this.authHydrated) return;
-                if (error) {
-                    console.error('Supabase session error:', error.message);
+                try {
+                    const { data, error } = await cloudSupabaseClient.auth.getSession();
+                    if (this.authHydrated) return;
+                    if (error) {
+                        console.error('Supabase session error:', error.message);
+                        this.authHydrated = true;
+                        this.updateUI();
+                        return;
+                    }
+
+                    if (data.session && data.session.user) {
+                        await this._hydrateAuthenticatedSession(data.session.user, { forceCloudLoad: true });
+                        return;
+                    }
+
                     this.authHydrated = true;
-                    this.updateUI();
-                    return;
-                }
-                this.authHydrated = true;
-                if (data.session && data.session.user) {
-                    this._enqueueLogin(data.session.user);
-                    this.loadFromCloud({ force: true }).catch((err) => {
-                        console.warn('Cloud load during init fallback failed:', err?.message || err);
-                    });
-                } else {
                     this.user = null;
                     this.loadedCloudUserId = null;
                     this.cleanupSingleSessionEnforcement();
                     this.updateUI();
+                } catch (err) {
+                    if (!this.authHydrated) {
+                        this.authHydrated = true;
+                        this.updateUI();
+                    }
+                    console.warn('Session fallback check failed:', err?.message || err);
+                } finally {
+                    this.authFallbackTimerId = null;
                 }
-            }).catch((err) => {
-                if (!this.authHydrated) {
-                    this.authHydrated = true;
-                    this.updateUI();
-                }
-                console.warn('Session fallback check failed:', err?.message || err);
-            });
+            })();
         }, 3000);
+    },
+
+    _clearAuthFallbackTimer: function () {
+        if (this.authFallbackTimerId) {
+            clearTimeout(this.authFallbackTimerId);
+            this.authFallbackTimerId = null;
+        }
+    },
+
+    _hydrateAuthenticatedSession: async function (user, options = {}) {
+        const closeAuthModal = options.closeAuthModal === true;
+        const forceCloudLoad = options.forceCloudLoad === true;
+        const previousUserId = this.user ? this.user.id : null;
+
+        await this._enqueueLogin(user);
+        this.authHydrated = true;
+
+        if (closeAuthModal) {
+            this.closeAuthModal();
+        }
+
+        const shouldLoadCloud = forceCloudLoad && (this.loadedCloudUserId !== user.id || previousUserId !== user.id);
+        if (shouldLoadCloud) {
+            await this.loadFromCloud({ force: true });
+        }
     },
 
     _isOnline: function () {

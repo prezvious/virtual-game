@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractBannedUntil } from "@/lib/ban";
+import { requireSameOriginBrowserRequest } from "@/lib/browser-request";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminWeatherValue, isWeatherGame } from "@/lib/weather";
 
 type AdminInventoryRpcResult = {
@@ -16,10 +17,19 @@ type AdminBalanceRpcResult = {
   coins?: number | string;
 };
 
+type AdminDeleteUserRpcResult = {
+  ok?: boolean;
+  reason?: string;
+};
+
 const PERMANENT_BAN_DURATION = "876000h";
 
 function forbidden() {
   return NextResponse.json({ ok: false, error: "Forbidden." }, { status: 403 });
+}
+
+function internalError(message = "An internal error occurred.") {
+  return NextResponse.json({ ok: false, error: message }, { status: 500 });
 }
 
 async function verifyAdmin(req: NextRequest) {
@@ -43,15 +53,17 @@ async function verifyAdmin(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    // Fix H-2: Add rate limiting to GET endpoints
-    const ip = getRequestIp(req);
-    const rate = consumeRateLimit({ key: `admin-get:${ip}`, limit: 30, windowMs: 60_000 });
+    const admin = await verifyAdmin(req);
+    if (!admin) return forbidden();
+
+    const rate = consumeRateLimit({
+      key: buildRateLimitKey("admin-get", req, { userId: admin.user.id }),
+      limit: 30,
+      windowMs: 60_000,
+    });
     if (!rate.allowed) {
       return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
     }
-
-    const admin = await verifyAdmin(req);
-    if (!admin) return forbidden();
 
     const tab = req.nextUrl.searchParams.get("tab") || "users";
     const { supabase } = admin;
@@ -125,16 +137,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = getRequestIp(req);
-    const rate = consumeRateLimit({ key: `admin:${ip}`, limit: 30, windowMs: 60_000 });
-    if (!rate.allowed) {
-      return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
+    const sameOriginError = requireSameOriginBrowserRequest(req);
+    if (sameOriginError) {
+      return sameOriginError;
     }
 
     const admin = await verifyAdmin(req);
     if (!admin) return forbidden();
 
     const { user: adminUser, supabase } = admin;
+    const rate = consumeRateLimit({
+      key: buildRateLimitKey("admin", req, { userId: adminUser.id }),
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (!rate.allowed) {
+      return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -147,12 +166,16 @@ export async function POST(req: NextRequest) {
     const targetId = String(body.target_user_id || "");
 
     async function logAction(details: Record<string, unknown>) {
-      await supabase.from("admin_logs").insert({
-        admin_id: adminUser.id,
-        action,
-        target_user_id: targetId || null,
-        details,
-      });
+      try {
+        await supabase.from("admin_logs").insert({
+          admin_id: adminUser.id,
+          action,
+          target_user_id: targetId || null,
+          details,
+        });
+      } catch (logError) {
+        console.error("[admin POST] failed to write admin log", logError);
+      }
     }
 
     if (action === "spawn_item") {
@@ -170,22 +193,25 @@ export async function POST(req: NextRequest) {
       });
 
       if (error) {
-        // Fix M-4: Log failed admin actions
-        await logAction({ item_id: itemId, delta: quantity, error: error.message });
+        await logAction({ status: "failed", item_id: itemId, delta: quantity, error: "inventory_rpc_failed" });
         return NextResponse.json({ ok: false, error: "Failed to update inventory." }, { status: 500 });
       }
 
       const result = data as AdminInventoryRpcResult | null;
       if (!result?.ok || typeof result.quantity !== "number") {
-        // Fix M-4: Log failed admin actions
-        await logAction({ item_id: itemId, delta: quantity, error: result?.reason || "RPC returned invalid result" });
+        await logAction({
+          status: "failed",
+          item_id: itemId,
+          delta: quantity,
+          error: result?.reason || "inventory_rpc_invalid_result",
+        });
         return NextResponse.json(
           { ok: false, error: result?.reason || "Failed to update inventory." },
           { status: 400 },
         );
       }
 
-      await logAction({ item_id: itemId, delta: quantity, final_quantity: result.quantity });
+      await logAction({ status: "success", item_id: itemId, delta: quantity, final_quantity: result.quantity });
       return NextResponse.json({ ok: true, message: `Spawned ${quantity}x ${itemId} for user.` });
     }
 
@@ -215,10 +241,18 @@ export async function POST(req: NextRequest) {
         );
 
       if (writeError) {
-        return NextResponse.json({ ok: false, error: writeError.message }, { status: 500 });
+        await logAction({
+          status: "failed",
+          game,
+          condition,
+          intensity,
+          error: "weather_write_failed",
+        });
+        return internalError("Failed to update weather settings.");
       }
 
       await logAction({
+        status: "success",
         game,
         condition: weatherValue.condition,
         intensity: weatherValue.intensity,
@@ -249,22 +283,24 @@ export async function POST(req: NextRequest) {
       });
 
       if (error) {
-        // Fix M-4: Log failed admin actions
-        await logAction({ delta, error: error.message });
+        await logAction({ status: "failed", delta, error: "balance_rpc_failed" });
         return NextResponse.json({ ok: false, error: "Failed to update balance." }, { status: 500 });
       }
 
       const result = data as AdminBalanceRpcResult | null;
       if (!result?.ok || result.coins === undefined) {
-        // Fix M-4: Log failed admin actions
-        await logAction({ delta, error: result?.reason || "RPC returned invalid result" });
+        await logAction({
+          status: "failed",
+          delta,
+          error: result?.reason || "balance_rpc_invalid_result",
+        });
         return NextResponse.json(
           { ok: false, error: result?.reason || "Failed to update balance." },
           { status: 400 },
         );
       }
 
-      await logAction({ delta, final_balance: result.coins });
+      await logAction({ status: "success", delta, final_balance: result.coins });
       return NextResponse.json({ ok: true, message: `Balance updated to ${String(result.coins)}.` });
     }
 
@@ -279,6 +315,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (targetId === adminUser.id) {
+        await logAction({ status: "denied", reason, error: "cannot_ban_self" });
         return NextResponse.json({ ok: false, error: "Cannot ban yourself." }, { status: 400 });
       }
 
@@ -289,10 +326,12 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (targetProfileError) {
-        return NextResponse.json({ ok: false, error: targetProfileError.message }, { status: 500 });
+        await logAction({ status: "failed", reason, error: "target_profile_lookup_failed" });
+        return internalError("Failed to verify target user.");
       }
 
       if (targetProfile?.is_admin) {
+        await logAction({ status: "denied", reason, error: "cannot_ban_admin" });
         return NextResponse.json({ ok: false, error: "Cannot ban another admin." }, { status: 403 });
       }
 
@@ -300,14 +339,15 @@ export async function POST(req: NextRequest) {
         ban_duration: PERMANENT_BAN_DURATION,
       });
       if (banError) {
-        await logAction({ reason, error: banError.message });
-        return NextResponse.json({ ok: false, error: banError.message }, { status: 500 });
+        await logAction({ status: "failed", reason, error: "ban_update_failed" });
+        return internalError("Failed to ban user.");
       }
 
       const bannedUntil = extractBannedUntil(banResult?.user)
         || extractBannedUntil((await supabase.auth.admin.getUserById(targetId)).data.user);
 
       await logAction({
+        status: "success",
         reason,
         banned_until: bannedUntil,
         ban_duration: PERMANENT_BAN_DURATION,
@@ -322,6 +362,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (targetId === adminUser.id) {
+        await logAction({ status: "denied", reason: String(body.reason || "Admin action"), error: "cannot_delete_self" });
         return NextResponse.json({ ok: false, error: "Cannot delete yourself." }, { status: 400 });
       }
 
@@ -332,31 +373,36 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (targetProfileError) {
-        return NextResponse.json({ ok: false, error: targetProfileError.message }, { status: 500 });
+        await logAction({ status: "failed", reason: String(body.reason || "Admin action"), error: "target_profile_lookup_failed" });
+        return internalError("Failed to verify target user.");
       }
 
       if (targetProfile?.is_admin) {
+        await logAction({ status: "denied", reason: String(body.reason || "Admin action"), error: "cannot_delete_admin" });
         return NextResponse.json({ ok: false, error: "Cannot delete another admin." }, { status: 403 });
       }
 
-      // Fix H-5: Delete related records before deleting the auth user
-      // Delete in order to respect foreign key constraints
-      await supabase.from("user_achievements").delete().eq("user_id", targetId);
-      await supabase.from("user_game_stats").delete().eq("user_id", targetId);
-      await supabase.from("follows").delete().eq("follower_id", targetId);
-      await supabase.from("follows").delete().eq("following_id", targetId);
-      await supabase.from("blocks").delete().eq("blocker_id", targetId);
-      await supabase.from("blocks").delete().eq("blocked_id", targetId);
-      await supabase.from("user_profiles").delete().eq("user_id", targetId);
-
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(targetId);
+      const deleteReason = String(body.reason || "Admin action");
+      const { data: deleteResult, error: deleteError } = await supabase.rpc("admin_delete_user_account", {
+        p_target_user_id: targetId,
+      });
       if (deleteError) {
-        await logAction({ reason: String(body.reason || "Admin action"), error: deleteError.message });
-        return NextResponse.json({ ok: false, error: deleteError.message }, { status: 500 });
+        await logAction({ status: "failed", reason: deleteReason, error: "delete_rpc_failed" });
+        return internalError("Failed to delete user.");
+      }
+
+      const result = deleteResult as AdminDeleteUserRpcResult | null;
+      if (!result?.ok) {
+        await logAction({ status: "failed", reason: deleteReason, error: result?.reason || "delete_failed" });
+        return NextResponse.json(
+          { ok: false, error: result?.reason || "Failed to delete user." },
+          { status: result?.reason === "User not found." ? 404 : 400 },
+        );
       }
 
       await logAction({
-        reason: String(body.reason || "Admin action"),
+        status: "success",
+        reason: deleteReason,
         source: "admin_console",
       });
 

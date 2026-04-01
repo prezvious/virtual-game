@@ -15,6 +15,8 @@
     let playtimeFlushInFlight = false;
     let playtimeIntervalId = null;
     let playtimeLifecycleBound = false;
+    let authQueue = Promise.resolve();
+    let profileRefreshInFlight = null;
 
     function trimTrailingSlash(value) {
         return value.replace(/\/+$/, "");
@@ -118,7 +120,8 @@
     }
 
     async function loadProfile() {
-        if (!activeUser) {
+        const profileUser = activeUser;
+        if (!profileUser) {
             cachedProfile = null;
             return null;
         }
@@ -127,10 +130,13 @@
         const { data, error } = await supabaseClient
             .from("user_profiles")
             .select("user_id, username")
-            .eq("user_id", activeUser.id)
+            .eq("user_id", profileUser.id)
             .maybeSingle();
 
         if (error) throw error;
+        if (!activeUser || activeUser.id !== profileUser.id) {
+            return cachedProfile;
+        }
 
         if (data) {
             cachedProfile = data;
@@ -138,10 +144,33 @@
         }
 
         cachedProfile = {
-            user_id: activeUser.id,
+            user_id: profileUser.id,
             username: ""
         };
         return cachedProfile;
+    }
+
+    function queueAuthWork(task) {
+        const nextRun = authQueue.then(task, task);
+        authQueue = nextRun.then(() => undefined, () => undefined);
+        return nextRun;
+    }
+
+    async function refreshActiveProfile() {
+        if (!activeUser) {
+            cachedProfile = null;
+            return null;
+        }
+
+        if (profileRefreshInFlight) {
+            return profileRefreshInFlight;
+        }
+
+        profileRefreshInFlight = loadProfile().finally(() => {
+            profileRefreshInFlight = null;
+        });
+
+        return profileRefreshInFlight;
     }
 
     function canTrackPlaytime() {
@@ -262,38 +291,40 @@
 
         bindPlaytimeLifecycle();
 
-        let sessionData;
-        try {
-            sessionData = await supabaseClient.auth.getSession();
-        } catch (sessionError) {
-            return { configured: true, user: null, profile: null, error: sessionError };
-        }
-
-        const { data, error } = sessionData;
-        if (error) {
-            return { configured: true, user: null, profile: null, error };
-        }
-
-        setActiveUser(data.session?.user || null);
-
-        if (activeUser) {
+        return queueAuthWork(async () => {
+            let sessionData;
             try {
-                await loadProfile();
-            } catch (profileError) {
-                console.error("Failed to load profile:", profileError);
+                sessionData = await supabaseClient.auth.getSession();
+            } catch (sessionError) {
+                return { configured: true, user: null, profile: null, error: sessionError };
             }
-        }
 
-        if (requireAuth && !activeUser) {
-            const target = redirectTo || "login.html";
-            window.location.href = target;
-        }
+            const { data, error } = sessionData;
+            if (error) {
+                return { configured: true, user: null, profile: null, error };
+            }
 
-        return {
-            configured: true,
-            user: activeUser,
-            profile: cachedProfile
-        };
+            setActiveUser(data.session?.user || null);
+
+            if (activeUser) {
+                try {
+                    await refreshActiveProfile();
+                } catch (profileError) {
+                    console.error("Failed to load profile:", profileError);
+                }
+            }
+
+            if (requireAuth && !activeUser) {
+                const target = redirectTo || "login.html";
+                window.location.href = target;
+            }
+
+            return {
+                configured: true,
+                user: activeUser,
+                profile: cachedProfile
+            };
+        });
     }
 
     async function redirectIfAuthenticated(target = "game.html") {
@@ -318,6 +349,29 @@
         }
     }
 
+    function wait(delayMs) {
+        return new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    async function waitForBridgeFarmerState(accountBridge, initialState, { attempts = 12, delayMs = 200 } = {}) {
+        let latestState = initialState || await readBridgeState(accountBridge);
+
+        for (let attempt = 0; attempt < attempts; attempt += 1) {
+            const farmerState = latestState?.farmer || null;
+            if (farmerState?.user || farmerState?.session) {
+                return latestState;
+            }
+
+            await wait(delayMs);
+            const nextState = await readBridgeState(accountBridge);
+            if (nextState) {
+                latestState = nextState;
+            }
+        }
+
+        return latestState;
+    }
+
     function getBridgeErrorMessage(result, fallbackMessage) {
         const message = typeof result?.error === "string" ? result.error.trim() : "";
         return message || fallbackMessage;
@@ -334,16 +388,17 @@
             const bridgeState = bridgeResult.state || await readBridgeState(accountBridge);
             const farmerUser = bridgeState?.farmer?.user || null;
             const farmerSession = bridgeState?.farmer?.session || null;
-            setActiveUser(farmerUser);
+            await queueAuthWork(async () => {
+                setActiveUser(farmerUser);
 
-            // Avoid profile reads until the user has an authenticated session token.
-            if (farmerUser && farmerSession) {
-                try {
-                    await loadProfile();
-                } catch (profileError) {
-                    console.error("Profile refresh failed after sign up:", profileError);
+                if (farmerUser && farmerSession) {
+                    try {
+                        await refreshActiveProfile();
+                    } catch (profileError) {
+                        console.error("Profile refresh failed after sign up:", profileError);
+                    }
                 }
-            }
+            });
 
             return {
                 user: farmerUser,
@@ -360,15 +415,17 @@
 
         if (error) throw error;
 
-        setActiveUser(data.session?.user || data.user || null);
+        await queueAuthWork(async () => {
+            setActiveUser(data.session?.user || data.user || null);
 
-        if (data.session?.user) {
-            try {
-                await loadProfile();
-            } catch (profileError) {
-                console.error("Profile refresh failed after sign up:", profileError);
+            if (data.session?.user) {
+                try {
+                    await refreshActiveProfile();
+                } catch (profileError) {
+                    console.error("Profile refresh failed after sign up:", profileError);
+                }
             }
-        }
+        });
 
         return data;
     }
@@ -381,7 +438,7 @@
                 throw new Error(getBridgeErrorMessage(bridgeResult, "Login failed."));
             }
 
-            let bridgeState = bridgeResult.state || await readBridgeState(accountBridge);
+            let bridgeState = await waitForBridgeFarmerState(accountBridge, bridgeResult.state);
             let farmerUser = bridgeState?.farmer?.user
                 || bridgeResult?.details?.farmer?.user
                 || bridgeResult?.details?.recovery?.farmer?.user
@@ -392,28 +449,20 @@
                 || null;
 
             if (!farmerUser) {
-                await new Promise((resolve) => setTimeout(resolve, 150));
-                const refreshed = await readBridgeState(accountBridge);
-                if (refreshed) {
-                    bridgeState = refreshed;
-                    farmerUser = refreshed?.farmer?.user || farmerUser;
-                    farmerSession = refreshed?.farmer?.session || farmerSession;
-                }
-            }
-
-            if (!farmerUser) {
                 const warning = Array.isArray(bridgeResult.warnings) && bridgeResult.warnings.length > 0
                     ? bridgeResult.warnings[0]
                     : "Virtual Farmer account is not ready. Verify account setup and try again.";
                 throw new Error(warning);
             }
 
-            setActiveUser(farmerUser);
-            try {
-                await loadProfile();
-            } catch (profileError) {
-                console.error("Failed to load profile after unified sign in:", profileError);
-            }
+            await queueAuthWork(async () => {
+                setActiveUser(farmerUser);
+                try {
+                    await refreshActiveProfile();
+                } catch (profileError) {
+                    console.error("Failed to load profile after unified sign in:", profileError);
+                }
+            });
 
             return {
                 user: farmerUser,
@@ -425,14 +474,16 @@
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        setActiveUser(data.user || null);
-        if (activeUser) {
-            try {
-                await loadProfile();
-            } catch (profileError) {
-                console.error("Failed to load profile after sign in:", profileError);
+        await queueAuthWork(async () => {
+            setActiveUser(data.user || null);
+            if (activeUser) {
+                try {
+                    await refreshActiveProfile();
+                } catch (profileError) {
+                    console.error("Failed to load profile after sign in:", profileError);
+                }
             }
-        }
+        });
 
         return data;
     }
@@ -660,16 +711,18 @@
             return () => {};
         }
 
-        const { data } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-            setActiveUser(session?.user || null);
-            if (activeUser) {
-                try {
-                    await loadProfile();
-                } catch (error) {
-                    console.error("Profile refresh failed on auth state change:", error);
+        const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+            void queueAuthWork(async () => {
+                setActiveUser(session?.user || null);
+                if (activeUser) {
+                    try {
+                        await refreshActiveProfile();
+                    } catch (error) {
+                        console.error("Profile refresh failed on auth state change:", error);
+                    }
                 }
-            }
-            callback({ user: activeUser, profile: cachedProfile });
+                callback({ user: activeUser, profile: cachedProfile });
+            });
         });
 
         return () => {

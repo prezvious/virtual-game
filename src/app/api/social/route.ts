@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSameOriginBrowserRequest } from "@/lib/browser-request";
 import { createAnonServerClient, createServiceSupabaseClient, stripBearer } from "@/lib/supabase";
-import { consumeRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { buildRateLimitKey, consumeRateLimit } from "@/lib/rate-limit";
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
@@ -129,14 +130,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = getRequestIp(req);
-  const rate = consumeRateLimit({ key: `social:${ip}`, limit: 30, windowMs: 60_000 });
-  if (!rate.allowed) {
-    return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
+  const sameOriginError = requireSameOriginBrowserRequest(req);
+  if (sameOriginError) {
+    return sameOriginError;
   }
 
   const user = await getAuthUser(req);
   if (!user) return unauthorized();
+
+  const rate = consumeRateLimit({
+    key: buildRateLimitKey("social", req, { userId: user.id }),
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json({ ok: false, error: "Rate limited." }, { status: 429 });
+  }
 
   let body: Record<string, string>;
   try {

@@ -34,12 +34,14 @@ function formatScore(value: unknown): string {
   return "0";
 }
 
-export async function fetchLeaderboardModel(limit = 10): Promise<LeaderboardModel> {
+export async function fetchLeaderboardModel(limit = 10, offset = 0): Promise<LeaderboardModel> {
   const supabase = createServiceSupabaseClient();
+  const upperRank = Math.max(1, offset + limit);
   const { data, error } = await supabase
     .from("leaderboard_snapshots")
     .select("metric, rank, username, score, refreshed_at")
-    .lte("rank", limit)
+    .gt("rank", offset)
+    .lte("rank", upperRank)
     .order("metric", { ascending: true })
     .order("rank", { ascending: true });
 
@@ -81,4 +83,3 @@ export async function fetchLeaderboardModel(limit = 10): Promise<LeaderboardMode
     error: "",
   };
 }
-

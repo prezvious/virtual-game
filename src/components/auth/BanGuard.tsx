@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./BanGuard.module.css";
 import { BAN_NOTICE_STORAGE_KEY, type BanNotice, type BanStatusResponse } from "@/lib/ban";
 import { getClientSupabase } from "@/lib/auth-client";
@@ -41,7 +41,7 @@ function formatBanTitle(notice: BanNotice): string {
 }
 
 export default function BanGuard() {
-  const supabase = useMemo(() => getClientSupabase(), []);
+  const supabase = getClientSupabase();
   const [notice, setNotice] = useState<BanNotice | null>(null);
   const handlingBanRef = useRef(false);
   const lastCheckRef = useRef(0);
@@ -159,7 +159,7 @@ export default function BanGuard() {
         backoffUntilRef.current = 0;
       }
       if (!session) {
-        if (!window.localStorage.getItem(BAN_NOTICE_STORAGE_KEY)) {
+        if (!readStoredNotice()) {
           handlingBanRef.current = false;
         }
         return;
