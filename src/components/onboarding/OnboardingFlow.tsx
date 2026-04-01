@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getClientSupabase } from "@/lib/auth-client";
 import styles from "./onboarding.module.css";
 
@@ -31,58 +31,106 @@ const STEPS = [
   },
 ];
 
+const ONBOARDING_DISMISSED_KEY = (userId: string) => `onboarding_dismissed:${userId}`;
+
 export default function OnboardingFlow() {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
   const [closing, setClosing] = useState(false);
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    let userId = "";
+    let mounted = true;
+
     const check = async () => {
       try {
         const supabase = getClientSupabase();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return;
-        userId = session.user.id;
-        const DISMISSED_KEY = `onboarding_dismissed:${userId}`;
-        if (localStorage.getItem(DISMISSED_KEY) === "true") return;
-        const { data } = await supabase
-          .from("onboarding_progress")
-          .select("completed_at, skipped")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-        if (data?.completed_at || data?.skipped) {
-          localStorage.setItem(DISMISSED_KEY, "true");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn("Onboarding session check failed:", sessionError.message);
           return;
         }
-        setVisible(true);
-        if (!data) {
-          await supabase.from("onboarding_progress").insert({ user_id: session.user.id });
+        if (!session?.user) return;
+        const userId = session.user.id;
+        userIdRef.current = userId;
+
+        const dismissedKey = ONBOARDING_DISMISSED_KEY(userId);
+        if (localStorage.getItem(dismissedKey) === "true") return;
+
+        const { data, error } = await supabase
+          .from("onboarding_progress")
+          .select("completed_at, skipped, steps_completed")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!mounted) return;
+
+        if (error) {
+          console.warn("Onboarding progress check failed:", error.message);
+          return;
         }
-      } catch {
-        // Silently skip onboarding check failures
+
+        if (data?.completed_at || data?.skipped) {
+          localStorage.setItem(dismissedKey, "true");
+
+          if (data?.skipped && !data?.completed_at) {
+            const { error: backfillError } = await supabase.from("onboarding_progress").upsert({
+              user_id: userId,
+              completed_at: new Date().toISOString(),
+              skipped: true,
+              steps_completed: Array.isArray(data.steps_completed) ? data.steps_completed : [],
+            }, { onConflict: "user_id" });
+
+            if (backfillError) {
+              console.warn("Onboarding skipped-state backfill failed:", backfillError.message);
+            }
+          }
+
+          return;
+        }
+
+        setStep(0);
+        setClosing(false);
+        setVisible(true);
+      } catch (error) {
+        console.warn("Onboarding visibility check failed:", error);
       }
     };
+
     void check();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const close = useCallback(async (skipped: boolean) => {
+    if (closing) return;
+
     setClosing(true);
+    setVisible(false);
+
+    const userId = userIdRef.current;
+    if (!userId) return;
+
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY(userId), "true");
+
     try {
       const supabase = getClientSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        localStorage.setItem(`onboarding_dismissed:${session.user.id}`, "true");
-        await supabase.from("onboarding_progress").update({
-          completed_at: new Date().toISOString(),
-          skipped,
-          steps_completed: STEPS.slice(0, step + 1).map((s) => s.id),
-        }).eq("user_id", session.user.id);
+      const { error } = await supabase.from("onboarding_progress").upsert({
+        user_id: userId,
+        completed_at: new Date().toISOString(),
+        skipped,
+        steps_completed: STEPS.slice(0, step + 1).map((s) => s.id),
+      }, { onConflict: "user_id" });
+
+      if (error) {
+        console.warn("Onboarding dismissal persistence failed:", error.message);
       }
-    } finally {
-      setTimeout(() => setVisible(false), 300);
+    } catch (error) {
+      console.warn("Onboarding dismissal failed:", error);
     }
-  }, [step]);
+  }, [closing, step]);
 
   if (!visible) return null;
 

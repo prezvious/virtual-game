@@ -41,12 +41,15 @@ const CloudSystem = {
     singleSessionEventName: 'new_tab_opened',
     lifecycleBound: false,
     authHydrated: false,
+    hydrating: false,
+    hydrateQueue: [],
     loadedCloudUserId: null,
     networkBound: false,
     pendingCloudSync: false,
     cloudSyncRetryTimer: null,
     cloudSyncRetryDelayMs: 5000,
     cloudSyncInFlight: false,
+    loadInFlight: false,
     lastOfflineNoticeAt: 0,
     realtimeSubscribed: false,
     realtimeReconnectTimer: null,
@@ -119,7 +122,7 @@ const CloudSystem = {
             if (hasSessionUser) {
                 const nextUser = session.user;
                 const previousUserId = this.user ? this.user.id : null;
-                await this.handleLoginSuccess(nextUser);
+                await this._enqueueLogin(nextUser);
                 this.authHydrated = true;
 
                 if (event === 'SIGNED_IN') {
@@ -142,27 +145,38 @@ const CloudSystem = {
             }
         });
 
-        // Fallback for environments where INITIAL_SESSION is delayed.
-        const { data, error } = await cloudSupabaseClient.auth.getSession();
-        if (error) {
-            console.error('Supabase session error:', error.message);
-            this.authHydrated = true;
-            this.updateUI();
-            return;
-        }
-
-        if (this.authHydrated) return;
-
-        this.authHydrated = true;
-        if (data.session && data.session.user) {
-            this.handleLoginSuccess(data.session.user);
-            await this.loadFromCloud({ force: true });
-        } else {
-            this.user = null;
-            this.loadedCloudUserId = null;
-            this.cleanupSingleSessionEnforcement();
-            this.updateUI();
-        }
+        // Timeout-based fallback: if INITIAL_SESSION hasn't fired within 3s,
+        // call getSession() directly, but only if not already hydrated.
+        setTimeout(() => {
+            if (this.authHydrated) return;
+            cloudSupabaseClient.auth.getSession().then(({ data, error }) => {
+                if (this.authHydrated) return;
+                if (error) {
+                    console.error('Supabase session error:', error.message);
+                    this.authHydrated = true;
+                    this.updateUI();
+                    return;
+                }
+                this.authHydrated = true;
+                if (data.session && data.session.user) {
+                    this._enqueueLogin(data.session.user);
+                    this.loadFromCloud({ force: true }).catch((err) => {
+                        console.warn('Cloud load during init fallback failed:', err?.message || err);
+                    });
+                } else {
+                    this.user = null;
+                    this.loadedCloudUserId = null;
+                    this.cleanupSingleSessionEnforcement();
+                    this.updateUI();
+                }
+            }).catch((err) => {
+                if (!this.authHydrated) {
+                    this.authHydrated = true;
+                    this.updateUI();
+                }
+                console.warn('Session fallback check failed:', err?.message || err);
+            });
+        }, 3000);
     },
 
     _isOnline: function () {
@@ -1016,6 +1030,23 @@ const CloudSystem = {
         await cloudSupabaseClient.auth.signOut();
     },
 
+    _enqueueLogin: async function (user) {
+        if (this.hydrating) {
+            this.hydrateQueue.push(user);
+            return;
+        }
+        this.hydrating = true;
+        try {
+            await this.handleLoginSuccess(user);
+        } finally {
+            this.hydrating = false;
+            if (this.hydrateQueue.length > 0) {
+                const next = this.hydrateQueue.shift();
+                await this._enqueueLogin(next);
+            }
+        }
+    },
+
     handleLoginSuccess: function (user) {
         const previousUserId = this.user ? this.user.id : null;
         if (previousUserId && previousUserId !== user.id) {
@@ -1365,6 +1396,9 @@ const CloudSystem = {
         if (!this.user || !this.sessionActive) return;
         if (!force && this.loadedCloudUserId === this.user.id) return;
         if (!cloudSupabaseClient || !this.game || !this.game.saveSystem) return;
+        if (this.cloudSyncInFlight || this.loadInFlight) {
+            return;
+        }
         const saveSystem = this.game.saveSystem;
 
         const hasLocalSnapshot = typeof saveSystem.hasPersistedLocalSave === 'function'
@@ -1382,88 +1416,93 @@ const CloudSystem = {
             return;
         }
 
-        const { data, error } = await cloudSupabaseClient
-            .from('game_saves')
-            .select('save_data, save_version, checksum')
-            .eq('user_id', this.user.id)
-            .single();
+        this.loadInFlight = true;
+        try {
+            const { data, error } = await cloudSupabaseClient
+                .from('game_saves')
+                .select('save_data, save_version, checksum')
+                .eq('user_id', this.user.id)
+                .single();
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                if (hasLocalSnapshot) {
-                    await this.saveToCloud();
-                    this.game.log('Cloud save initialized from local progress.');
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    if (hasLocalSnapshot) {
+                        await this.saveToCloud();
+                        this.game.log('Cloud save initialized from local progress.');
+                    }
+                    this.loadedCloudUserId = this.user.id;
+                    return;
+                }
+
+                if (this._isRetriableCloudError(error)) {
+                    if (hasLocalSnapshot) {
+                        this.pendingCloudSync = true;
+                        this._scheduleCloudSyncRetry();
+                    }
+                    this.updateUI();
+                    return;
+                }
+
+                if (error.code !== 'PGRST116') {
+                    console.error('Cloud load failed:', error.message);
                 }
                 this.loadedCloudUserId = this.user.id;
                 return;
             }
 
-            if (this._isRetriableCloudError(error)) {
+            if (!this.sessionActive) return;
+
+            const parsedCloud = typeof saveSystem.parseSupabaseRow === 'function'
+                ? saveSystem.parseSupabaseRow(data)
+                : null;
+            const cloudRequiresUpgrade = !!(parsedCloud && parsedCloud.ok && parsedCloud.checksumBypassed);
+
+            if (!parsedCloud || !parsedCloud.ok) {
+                this.game.log('Cloud save invalid and was skipped.');
                 if (hasLocalSnapshot) {
-                    this.pendingCloudSync = true;
-                    this._scheduleCloudSyncRetry();
+                    await this.saveToCloud();
+                    this.game.log('Invalid cloud row replaced with local progress.');
                 }
-                this.updateUI();
+                this.loadedCloudUserId = this.user.id;
                 return;
             }
 
-            if (error.code !== 'PGRST116') {
-                console.error('Cloud load failed:', error.message);
-            }
-            this.loadedCloudUserId = this.user.id;
-            return;
-        }
+            const cloudTimestamp = typeof saveSystem.getStateTimestamp === 'function'
+                ? saveSystem.getStateTimestamp(parsedCloud.state)
+                : 0;
 
-        if (!this.sessionActive) return;
-
-        const parsedCloud = typeof saveSystem.parseSupabaseRow === 'function'
-            ? saveSystem.parseSupabaseRow(data)
-            : null;
-        const cloudRequiresUpgrade = !!(parsedCloud && parsedCloud.ok && parsedCloud.checksumBypassed);
-
-        if (!parsedCloud || !parsedCloud.ok) {
-            this.game.log('Cloud save invalid and was skipped.');
-            if (hasLocalSnapshot) {
+            if (hasLocalSnapshot && localTimestamp > cloudTimestamp) {
                 await this.saveToCloud();
-                this.game.log('Invalid cloud row replaced with local progress.');
+                this.game.log('Local save is newer than cloud. Uploaded local progress.');
+                this.loadedCloudUserId = this.user.id;
+                return;
             }
+
+            const applied = saveSystem.applySupabaseRow(data);
+            if (applied) {
+                if (typeof this.game._applySettingsDefaults === 'function') this.game._applySettingsDefaults();
+                if (typeof this.game._applyThemeMode === 'function') this.game._applyThemeMode();
+                if (typeof this.game._renderSettingsPanel === 'function') this.game._renderSettingsPanel();
+                this.game.ui.renderAll();
+
+                if (typeof saveSystem.persistCurrentStateToLocal === 'function') {
+                    saveSystem.persistCurrentStateToLocal();
+                }
+
+                if (cloudRequiresUpgrade) {
+                    await this.saveToCloud();
+                    this.game.log('Cloud save upgraded to the latest checksum format.');
+                }
+
+                this.game.log('Progress loaded from cloud.');
+            } else {
+                this.game.log('Cloud save invalid and was skipped.');
+            }
+
             this.loadedCloudUserId = this.user.id;
-            return;
+        } finally {
+            this.loadInFlight = false;
         }
-
-        const cloudTimestamp = typeof saveSystem.getStateTimestamp === 'function'
-            ? saveSystem.getStateTimestamp(parsedCloud.state)
-            : 0;
-
-        if (hasLocalSnapshot && localTimestamp > cloudTimestamp) {
-            await this.saveToCloud();
-            this.game.log('Local save is newer than cloud. Uploaded local progress.');
-            this.loadedCloudUserId = this.user.id;
-            return;
-        }
-
-        const applied = saveSystem.applySupabaseRow(data);
-        if (applied) {
-            if (typeof this.game._applySettingsDefaults === 'function') this.game._applySettingsDefaults();
-            if (typeof this.game._applyThemeMode === 'function') this.game._applyThemeMode();
-            if (typeof this.game._renderSettingsPanel === 'function') this.game._renderSettingsPanel();
-            this.game.ui.renderAll();
-
-            if (typeof saveSystem.persistCurrentStateToLocal === 'function') {
-                saveSystem.persistCurrentStateToLocal();
-            }
-
-            if (cloudRequiresUpgrade) {
-                await this.saveToCloud();
-                this.game.log('Cloud save upgraded to the latest checksum format.');
-            }
-
-            this.game.log('Progress loaded from cloud.');
-        } else {
-            this.game.log('Cloud save invalid and was skipped.');
-        }
-
-        this.loadedCloudUserId = this.user.id;
     }
 };
 

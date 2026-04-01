@@ -44,6 +44,9 @@ export default function BanGuard() {
   const supabase = useMemo(() => getClientSupabase(), []);
   const [notice, setNotice] = useState<BanNotice | null>(null);
   const handlingBanRef = useRef(false);
+  const lastCheckRef = useRef(0);
+  const consecutive401Ref = useRef(0);
+  const backoffUntilRef = useRef(0);
 
   const syncStoredNotice = useCallback(() => {
     setNotice(readStoredNotice());
@@ -87,6 +90,11 @@ export default function BanGuard() {
       return;
     }
 
+    const now = Date.now();
+    if (now < backoffUntilRef.current) return;
+    if (now - lastCheckRef.current < 5000) return;
+    lastCheckRef.current = now;
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       if (!window.localStorage.getItem(BAN_NOTICE_STORAGE_KEY)) {
@@ -100,6 +108,17 @@ export default function BanGuard() {
         headers: { Authorization: `Bearer ${session.access_token}` },
         cache: "no-store",
       });
+      if (response.status === 401) {
+        consecutive401Ref.current += 1;
+        if (consecutive401Ref.current >= 2) {
+          backoffUntilRef.current = Date.now() + 5 * 60 * 1000;
+        }
+        if (consecutive401Ref.current >= 5) {
+          backoffUntilRef.current = Date.now() + 24 * 60 * 60 * 1000;
+        }
+        return;
+      }
+      consecutive401Ref.current = 0;
       const json = await response.json() as BanStatusResponse | { ok: false; error?: string };
       if (!response.ok || !json.ok || !json.banned) return;
       await handleBanned(json);
@@ -114,7 +133,11 @@ export default function BanGuard() {
       void checkBanStatus();
     }, 0);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") {
+        consecutive401Ref.current = 0;
+        backoffUntilRef.current = 0;
+      }
       if (!session) {
         if (!window.localStorage.getItem(BAN_NOTICE_STORAGE_KEY)) {
           handlingBanRef.current = false;
@@ -142,12 +165,6 @@ export default function BanGuard() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("storage", handleStorage);
 
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void checkBanStatus();
-      }
-    }, 30_000);
-
     return () => {
       window.clearTimeout(syncTimerId);
       window.clearTimeout(checkTimerId);
@@ -155,7 +172,6 @@ export default function BanGuard() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("storage", handleStorage);
-      window.clearInterval(intervalId);
     };
   }, [checkBanStatus, supabase, syncStoredNotice]);
 
