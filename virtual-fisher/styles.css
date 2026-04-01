@@ -3586,24 +3586,20 @@ body {
 .results-panel-stack {
     grid-area: rail;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
     gap: 0.9rem;
     align-self: stretch;
-    width: 100%;
-    min-height: 30rem;
-}
-
-.fishing-zone.fishing-zone--idle .results-panel-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto;
     width: 100%;
     min-height: 0;
 }
 
+.fishing-zone.fishing-zone--idle .results-panel-stack {
+    display: none;
+}
+
 #auto-results-panel,
 #manual-results-panel {
-    display: grid;
+    display: none;
     grid-template-rows: auto 1fr;
     align-content: start;
     min-height: 0;
@@ -3611,34 +3607,8 @@ body {
 
 .fishing-zone.fishing-zone--manual #manual-results-panel,
 .fishing-zone.fishing-zone--auto #auto-results-panel {
-    order: 1;
+    display: grid;
     min-height: 100%;
-}
-
-.fishing-zone.fishing-zone--manual #auto-results-panel,
-.fishing-zone.fishing-zone--auto #manual-results-panel {
-    order: 2;
-}
-
-.fishing-zone.fishing-zone--manual #auto-results-panel .farm-results-grid,
-.fishing-zone.fishing-zone--auto #manual-results-panel .farm-results-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.fishing-zone.fishing-zone--manual #auto-results-panel .farm-result-card,
-.fishing-zone.fishing-zone--auto #manual-results-panel .farm-result-card {
-    padding: 0.55rem 0.6rem;
-}
-
-.fishing-zone.fishing-zone--manual #auto-results-panel .farm-result-value,
-.fishing-zone.fishing-zone--auto #manual-results-panel .farm-result-value {
-    font-size: 1.15rem;
-}
-
-.fishing-zone.fishing-zone--manual #auto-results-panel .farm-result-label,
-.fishing-zone.fishing-zone--auto #manual-results-panel .farm-result-label {
-    margin-top: 0.18rem;
-    font-size: 0.72rem;
 }
 
 .panel {

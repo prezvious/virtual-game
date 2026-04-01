@@ -105,15 +105,28 @@ class UI {
         const zone = document.querySelector('.fishing-zone');
         if (!zone) return;
 
+        const isAutoMode = mode === 'auto';
+        const isManualMode = mode === 'manual';
+        const hasActiveMode = isAutoMode || isManualMode;
+
         zone.classList.remove('fishing-zone--idle', 'fishing-zone--manual', 'fishing-zone--auto');
 
-        if (mode === 'auto') {
+        if (isAutoMode) {
             zone.classList.add('fishing-zone--auto');
-        } else if (mode === 'manual') {
+        } else if (isManualMode) {
             zone.classList.add('fishing-zone--manual');
         } else {
             zone.classList.add('fishing-zone--idle');
         }
+
+        const resultsStack = zone.querySelector('.results-panel-stack');
+        if (resultsStack) resultsStack.hidden = !hasActiveMode;
+
+        const autoResultsPanel = document.getElementById('auto-results-panel');
+        const manualResultsPanel = document.getElementById('manual-results-panel');
+
+        if (autoResultsPanel) autoResultsPanel.hidden = !isAutoMode;
+        if (manualResultsPanel) manualResultsPanel.hidden = !isManualMode;
     }
 
     renderLocations() {
