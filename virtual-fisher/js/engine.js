@@ -1163,6 +1163,32 @@
             const normalizedMode = mode === 'auto' || mode === 'manual' ? mode : 'idle';
             this.activeFishingMode = normalizedMode;
             this.ui.setFishingZoneMode(normalizedMode);
+            this._syncFishingControls();
+        }
+
+        _isManualFishingActive() {
+            return this.activeFishingMode === 'manual' || this.minigame.active;
+        }
+
+        _isAutoFishingActive() {
+            return this.autoFish.enabled || this.autoFish.phase !== 'idle';
+        }
+
+        _syncFishingControls() {
+            const autoBtn = document.getElementById('auto-fish-btn');
+            const castBtn = document.getElementById('action-btn');
+            const manualLocked = this._isAutoFishingActive();
+            const autoLocked = this._isManualFishingActive() && !this._isAutoFishingActive();
+
+            if (castBtn) {
+                castBtn.disabled = manualLocked;
+                castBtn.style.opacity = manualLocked ? '0.5' : '1';
+            }
+
+            if (autoBtn) {
+                autoBtn.disabled = autoLocked;
+                autoBtn.style.opacity = autoLocked ? '0.5' : '1';
+            }
         }
 
         _normalizeSpeciesName(name) {
@@ -2048,6 +2074,10 @@
 
         startCast() {
             if (this.minigame.active) return false; // Prevent double cast
+            if (this._isAutoFishingActive()) {
+                this.ui.updateStatus('Disable auto fishing before casting manually.', 'warning');
+                return false;
+            }
             this.setFishingMode('manual');
 
             // Rate limiting to prevent rapid cast exploits
@@ -2556,7 +2586,13 @@
 
         /* --- AUTO-FISHING SYSTEM (Background-safe via Web Worker) --- */
         toggleAutoFish() {
-            this.autoFish.enabled = !this.autoFish.enabled;
+            const enablingAutoFish = !this.autoFish.enabled;
+            if (enablingAutoFish && this._isManualFishingActive()) {
+                this.ui.updateStatus('Finish the manual catch before enabling auto fishing.', 'warning');
+                return false;
+            }
+
+            this.autoFish.enabled = enablingAutoFish;
             this.state.autoFishEnabled = this.autoFish.enabled;
             const btn = document.getElementById('auto-fish-btn');
             const castBtn = document.getElementById('action-btn');
@@ -2564,16 +2600,12 @@
             if (this.autoFish.enabled) {
                 btn.textContent = 'Disable Auto Fish';
                 btn.classList.add('active');
-                castBtn.disabled = true;
-                castBtn.style.opacity = '0.5';
                 this.setFishingMode('auto');
                 this.log('Auto-fishing ENABLED (runs in background).');
                 this.startAutoFishCycle();
             } else {
                 btn.textContent = 'Enable Auto Fish';
                 btn.classList.remove('active');
-                castBtn.disabled = false;
-                castBtn.style.opacity = '1';
                 castBtn.textContent = 'Cast Line';
                 this.autoFish.phase = 'idle';
                 this._cancelWorkerTimeout(this.autoFish.timer);
@@ -2590,6 +2622,7 @@
             }
             this.ui.renderStats();
             this.saveSystem.save();
+            return true;
         }
 
         startAutoFishCycle() {
