@@ -108,9 +108,15 @@ export default function AchievementsClient() {
         ) : error ? (
           <div className={styles.emptyMsg}>
             <p>{error}</p>
-            <button onClick={() => void load()} className={styles.filterBtn} style={{ marginTop: "0.5rem" }}>
-              Retry
-            </button>
+            {error === "Sign in to view achievements." ? (
+              <Link href="/account-center" className={styles.filterBtn} style={{ marginTop: "0.5rem", display: "inline-block", textDecoration: "none" }}>
+                Sign In
+              </Link>
+            ) : (
+              <button onClick={() => void load()} className={styles.filterBtn} style={{ marginTop: "0.5rem" }}>
+                Retry
+              </button>
+            )}
           </div>
         ) : filtered.length === 0 ? (
           <p className={styles.emptyMsg}>No achievements in this category.</p>

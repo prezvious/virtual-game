@@ -115,8 +115,10 @@ export default function SelfProfileClient() {
     void loadProfile();
 
     const supabase = getClientSupabase();
-    const { data } = supabase.auth.onAuthStateChange(() => {
-      void loadProfile();
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        void loadProfile();
+      }
     });
 
     return () => {

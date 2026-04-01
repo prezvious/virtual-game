@@ -254,7 +254,7 @@ export async function GET(req: NextRequest) {
       ...profile,
       followers_count: followersCount || 0,
       following_count: followingCount || 0,
-      recent_achievements: achievements || [],
+      recent_achievements: normalizeAchievementRows((achievements || []) as unknown[]),
     },
   });
 }
@@ -290,17 +290,6 @@ export async function PATCH(req: NextRequest) {
   try {
     await ensureOwnProfileRow(serviceClient, auth.user.id);
 
-    if (Object.keys(updates).length > 0) {
-      const { error } = await serviceClient
-        .from("user_profiles")
-        .update(updates)
-        .eq("user_id", auth.user.id);
-
-      if (error) {
-        throw error;
-      }
-    }
-
     if (requestedUsername !== null) {
       const { data, error } = await serviceClient.rpc("_claim_username_for_user", {
         target_user_id: auth.user.id,
@@ -316,6 +305,17 @@ export async function PATCH(req: NextRequest) {
           { ok: false, error: data?.reason || "Could not save username." },
           { status: 400 },
         );
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const { error } = await serviceClient
+        .from("user_profiles")
+        .update(updates)
+        .eq("user_id", auth.user.id);
+
+      if (error) {
+        throw error;
       }
     }
 

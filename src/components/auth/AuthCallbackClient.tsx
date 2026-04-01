@@ -45,30 +45,17 @@ export default function AuthCallbackClient() {
         const query = new URLSearchParams(window.location.search);
 
         let applied = false;
-        const accessToken = hash.get("access_token");
-        const refreshToken = hash.get("refresh_token");
 
-        if (accessToken && refreshToken) {
-          setStatus("Applying secure session...");
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          applied = !error;
-        }
-
-        if (!applied) {
-          const code = query.get("code");
-          if (code) {
-            setStatus("Exchanging authorization code...");
-            const result = await exchangeViaServer({ code });
-            if (result.ok && result.session?.access_token && result.session?.refresh_token) {
-              const { error } = await supabase.auth.setSession({
-                access_token: result.session.access_token,
-                refresh_token: result.session.refresh_token,
-              });
-              applied = !error;
-            }
+        const code = query.get("code");
+        if (code) {
+          setStatus("Exchanging authorization code...");
+          const result = await exchangeViaServer({ code });
+          if (result.ok && result.session?.access_token && result.session?.refresh_token) {
+            const { error } = await supabase.auth.setSession({
+              access_token: result.session.access_token,
+              refresh_token: result.session.refresh_token,
+            });
+            applied = !error;
           }
         }
 
@@ -85,6 +72,19 @@ export default function AuthCallbackClient() {
               });
               applied = !error;
             }
+          }
+        }
+
+        if (!applied) {
+          const accessToken = hash.get("access_token");
+          const refreshToken = hash.get("refresh_token");
+          if (accessToken && refreshToken) {
+            setStatus("Applying secure session...");
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            applied = !error;
           }
         }
 

@@ -79,7 +79,7 @@ export default function FriendsClient() {
   }, [tab, fetchData]);
 
   const getUserId = (item: SocialUser) => item.follower_id || item.following_id || item.blocked_id || "";
-  const getUsername = (item: SocialUser) => item.user_profiles?.username || "Unknown";
+  const getUsername = (item: SocialUser) => item.user_profiles?.username || null;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "friends", label: "Friends" },
@@ -126,12 +126,20 @@ export default function FriendsClient() {
           data.map((item, index) => {
             const userId = getUserId(item);
             const uname = getUsername(item);
+            const displayName = uname || "No username";
             return (
               <div key={`${tab}-${userId}-${index}`} className={styles.row}>
-                <Link href={`/profile/${uname}`} className={styles.userLink}>
-                  <span className={styles.userAvatar}>{uname.charAt(0).toUpperCase()}</span>
-                  <span className={styles.userName}>@{uname}</span>
-                </Link>
+                {uname ? (
+                  <Link href={`/profile/${uname}`} className={styles.userLink}>
+                    <span className={styles.userAvatar}>{uname.charAt(0).toUpperCase()}</span>
+                    <span className={styles.userName}>@{uname}</span>
+                  </Link>
+                ) : (
+                  <span className={styles.userLink}>
+                    <span className={styles.userAvatar}>?</span>
+                    <span className={styles.userName}>{displayName}</span>
+                  </span>
+                )}
                 <div className={styles.rowActions}>
                   {tab === "followers" && (
                     <button onClick={() => void doAction("follow", userId)} disabled={actionBusy} className={styles.btnSmall}>Follow Back</button>

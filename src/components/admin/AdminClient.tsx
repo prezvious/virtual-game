@@ -189,7 +189,7 @@ export default function AdminClient() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.user_id}>
-                    <td><Link href={`/profile/${u.username}`}>@{u.username}</Link></td>
+                    <td>{u.username ? <Link href={`/profile/${u.username}`}>@{u.username}</Link> : <span style={{ color: "var(--text-muted)" }}>No username</span>}</td>
                     <td>{u.is_admin ? "Yes" : "No"}</td>
                     <td>{new Date(u.created_at).toLocaleDateString()}</td>
                     <td className={styles.mono}>{u.user_id.slice(0, 8)}...</td>

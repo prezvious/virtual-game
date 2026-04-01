@@ -98,7 +98,7 @@ export default function ProfileClient({ username }: Props) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      await fetch("/api/social", {
+      const res = await fetch("/api/social", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -106,6 +106,8 @@ export default function ProfileClient({ username }: Props) {
         },
         body: JSON.stringify({ action, target_id: profile.user_id }),
       });
+      const json = await res.json();
+      if (!json.ok) return;
 
       const socialRes = await fetch(`/api/social?tab=status&target_id=${profile.user_id}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },

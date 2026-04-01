@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       banned: true,
       bannedUntil: bannedUntil ?? null,
-      isPermanent: authErrorCode === "user_banned" || isPermanentBan(bannedUntil),
+      isPermanent: isPermanentBan(bannedUntil),
       ...(reason ? { reason } : {}),
     });
   } catch (error) {

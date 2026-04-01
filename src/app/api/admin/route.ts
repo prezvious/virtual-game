@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, settings: data || [] });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: false, error: `Unknown tab: ${tab}.` }, { status: 400 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown server error";
     console.error("[admin GET]", message);
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "set_weather") {
       const condition = String(body.condition || "clear");
-      const intensity = Math.min(Math.max(1, Number(body.intensity) || 1), 100);
+      const intensity = Math.min(Math.max(1, Number(body.intensity) || 1), 5);
       const game = String(body.game || "").toLowerCase();
 
       if (game !== "fisher" && game !== "farmer") {
@@ -305,6 +305,11 @@ export async function POST(req: NextRequest) {
         await logAction({ reason: String(body.reason || "Admin action"), error: deleteError.message });
         return NextResponse.json({ ok: false, error: deleteError.message }, { status: 500 });
       }
+
+      await logAction({
+        reason: String(body.reason || "Admin action"),
+        source: "admin_console",
+      });
 
       return NextResponse.json({ ok: true, message: "User account and data deleted." });
     }

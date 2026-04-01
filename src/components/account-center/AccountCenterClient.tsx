@@ -79,6 +79,12 @@ function ensureSupabaseScript(): Promise<void> {
         return;
       }
 
+      if (currentScript.dataset.loadFailed === "true") {
+        currentScript.remove();
+        loadSupabaseScript(resolve, reject);
+        return;
+      }
+
       currentScript.addEventListener("load", () => {
         if (hasSupabaseFactory()) {
           resolve();
@@ -86,23 +92,33 @@ function ensureSupabaseScript(): Promise<void> {
         }
         reject(new Error("Supabase client library is not available."));
       });
-      currentScript.addEventListener("error", () => reject(new Error("Supabase client script failed to load.")));
+      currentScript.addEventListener("error", () => {
+        currentScript.dataset.loadFailed = "true";
+        reject(new Error("Supabase client script failed to load."));
+      });
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = SUPABASE_VENDOR_SRC;
-    script.async = true;
-    script.onload = () => {
-      if (hasSupabaseFactory()) {
-        resolve();
-        return;
-      }
-      reject(new Error("Supabase client library is not available."));
-    };
-    script.onerror = () => reject(new Error("Supabase client script failed to load."));
-    document.head.appendChild(script);
+    loadSupabaseScript(resolve, reject);
   });
+}
+
+function loadSupabaseScript(resolve: () => void, reject: (reason: Error) => void) {
+  const script = document.createElement("script");
+  script.src = SUPABASE_VENDOR_SRC;
+  script.async = true;
+  script.onload = () => {
+    if (hasSupabaseFactory()) {
+      resolve();
+      return;
+    }
+    reject(new Error("Supabase client library is not available."));
+  };
+  script.onerror = () => {
+    script.dataset.loadFailed = "true";
+    reject(new Error("Supabase client script failed to load."));
+  };
+  document.head.appendChild(script);
 }
 
 function hasRuntimeConfig() {
@@ -120,6 +136,12 @@ function ensureRuntimeConfigScript(): Promise<void> {
       | null;
 
     if (currentScript) {
+      if (currentScript.dataset.loadFailed === "true") {
+        currentScript.remove();
+        loadRuntimeConfigScript(resolve, reject);
+        return;
+      }
+
       currentScript.addEventListener("load", () => {
         if (hasRuntimeConfig()) {
           resolve();
@@ -127,23 +149,33 @@ function ensureRuntimeConfigScript(): Promise<void> {
         }
         reject(new Error("Runtime auth config loaded without platform settings."));
       });
-      currentScript.addEventListener("error", () => reject(new Error("Runtime auth config failed to load.")));
+      currentScript.addEventListener("error", () => {
+        currentScript.dataset.loadFailed = "true";
+        reject(new Error("Runtime auth config failed to load."));
+      });
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = RUNTIME_CONFIG_SRC;
-    script.async = true;
-    script.onload = () => {
-      if (hasRuntimeConfig()) {
-        resolve();
-        return;
-      }
-      reject(new Error("Runtime auth config loaded without platform settings."));
-    };
-    script.onerror = () => reject(new Error("Runtime auth config failed to load."));
-    document.head.appendChild(script);
+    loadRuntimeConfigScript(resolve, reject);
   });
+}
+
+function loadRuntimeConfigScript(resolve: () => void, reject: (reason: Error) => void) {
+  const script = document.createElement("script");
+  script.src = RUNTIME_CONFIG_SRC;
+  script.async = true;
+  script.onload = () => {
+    if (hasRuntimeConfig()) {
+      resolve();
+      return;
+    }
+    reject(new Error("Runtime auth config loaded without platform settings."));
+  };
+  script.onerror = () => {
+    script.dataset.loadFailed = "true";
+    reject(new Error("Runtime auth config failed to load."));
+  };
+  document.head.appendChild(script);
 }
 
 async function ensureBridgeScript(): Promise<AccountBridgeApi> {
@@ -158,6 +190,12 @@ async function ensureBridgeScript(): Promise<AccountBridgeApi> {
   return new Promise((resolve, reject) => {
     const currentScript = document.querySelector(`script[src="${BRIDGE_SRC}"]`);
     if (currentScript) {
+      if ((currentScript as HTMLScriptElement).dataset.loadFailed === "true") {
+        currentScript.remove();
+        loadBridgeScript(resolve, reject);
+        return;
+      }
+
       currentScript.addEventListener("load", () => {
         if (window.PlatformAccountBridge) {
           resolve(window.PlatformAccountBridge);
@@ -165,23 +203,33 @@ async function ensureBridgeScript(): Promise<AccountBridgeApi> {
         }
         reject(new Error("Bridge loaded without API."));
       });
-      currentScript.addEventListener("error", () => reject(new Error("Bridge script failed to load.")));
+      currentScript.addEventListener("error", () => {
+        (currentScript as HTMLScriptElement).dataset.loadFailed = "true";
+        reject(new Error("Bridge script failed to load."));
+      });
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = BRIDGE_SRC;
-    script.async = true;
-    script.onload = () => {
-      if (window.PlatformAccountBridge) {
-        resolve(window.PlatformAccountBridge);
-        return;
-      }
-      reject(new Error("Bridge loaded without API."));
-    };
-    script.onerror = () => reject(new Error("Bridge script failed to load."));
-    document.head.appendChild(script);
+    loadBridgeScript(resolve, reject);
   });
+}
+
+function loadBridgeScript(resolve: (api: AccountBridgeApi) => void, reject: (reason: Error) => void) {
+  const script = document.createElement("script");
+  script.src = BRIDGE_SRC;
+  script.async = true;
+  script.onload = () => {
+    if (window.PlatformAccountBridge) {
+      resolve(window.PlatformAccountBridge);
+      return;
+    }
+    reject(new Error("Bridge loaded without API."));
+  };
+  script.onerror = () => {
+    script.dataset.loadFailed = "true";
+    reject(new Error("Bridge script failed to load."));
+  };
+  document.head.appendChild(script);
 }
 
 function statusText(state: BridgeSessionState | null) {

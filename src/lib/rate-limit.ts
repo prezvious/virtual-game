@@ -62,5 +62,6 @@ export function getRequestIp(req: NextRequest): string {
 
   const realIp = req.headers.get("x-real-ip");
   if (realIp) return realIp.trim();
-  return "unknown";
+
+  return `anon:${crypto.randomUUID()}`;
 }
