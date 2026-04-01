@@ -3518,6 +3518,11 @@ body {
     align-content: stretch;
 }
 
+.fishing-zone.fishing-zone--idle .timing-slot,
+.fishing-zone.fishing-zone--idle #status-message {
+    display: none;
+}
+
 .last-catch-display {
     display: flex;
     align-items: center;
