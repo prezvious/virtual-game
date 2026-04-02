@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import FullDocumentLink from "@/components/ui/FullDocumentLink";
 import type { LeaderboardModel } from "@/lib/leaderboard";
 import styles from "@/app/leaderboard/leaderboard.module.css";
 
@@ -121,9 +122,9 @@ export default function LeaderboardLive({ initialModel }: Props) {
           <Link className={`${styles.btn} ${styles.btnSecondary}`} href="/home">
             Return Home
           </Link>
-          <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/fish">
+          <FullDocumentLink className={`${styles.btn} ${styles.btnPrimary}`} href="/fish">
             Open Virtual Fisher
-          </Link>
+          </FullDocumentLink>
         </div>
       </section>
     </div>

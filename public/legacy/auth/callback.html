@@ -268,11 +268,11 @@
         <p class="status-text" id="status-text">Checking token signature...</p>
 
         <div class="actions">
-            <a id="go-main-btn" class="go-btn" href="#">Go To Main Page</a>
+            <a id="go-main-btn" class="go-btn" href="#">Open Account Center</a>
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/vendor/supabase/supabase.js?v=20260402a"></script>
     <script src="/runtime-supabase-config.js"></script>
     <script src="/platform-account-bridge.js"></script>
     <script>
@@ -293,15 +293,8 @@
         const statusText = document.getElementById('status-text');
         const goMainBtn = document.getElementById('go-main-btn');
 
-        function getBasePath() {
-            const suffix = '/auth/callback.html';
-            const path = window.location.pathname;
-            if (path.endsWith(suffix)) return path.slice(0, -suffix.length) || '';
-            return '';
-        }
-
         function getMainPageUrl() {
-            return `${window.location.origin}${getBasePath()}/`;
+            return `${window.location.origin}/account-center`;
         }
 
         function setStatus(message) {
@@ -312,7 +305,7 @@
             card.classList.add('success');
             titleText.textContent = 'Registration complete.';
             subtitleText.textContent = 'You are registered and ready to synchronize data.';
-            setStatus('Session verified. Redirecting to the main page...');
+            setStatus('Session verified. Redirecting to the account center...');
             goMainBtn.classList.add('ready');
 
             if (autoRedirect) {

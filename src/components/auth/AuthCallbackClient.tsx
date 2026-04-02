@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getClientSupabase } from "@/lib/auth-client";
+import FullDocumentLink from "@/components/ui/FullDocumentLink";
 
 type ExchangeResponse = {
   ok: boolean;
@@ -137,9 +138,9 @@ export default function AuthCallbackClient() {
             <Link className="app-btn" href="/account-center">
               Open Account Center
             </Link>
-            <Link className="app-btn secondary" href="/fish">
+            <FullDocumentLink className="app-btn secondary" href="/fish">
               Launch Virtual Fisher
-            </Link>
+            </FullDocumentLink>
           </div>
         ) : null}
       </section>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FullDocumentLink from "@/components/ui/FullDocumentLink";
 import styles from "./home-page.module.css";
 
 const worldCards = [
@@ -50,6 +51,10 @@ const highlights = [
   { value: "1", label: "shared identity layer" },
 ];
 
+function isGameRoute(href: string) {
+  return href === "/fish" || href === "/farm";
+}
+
 export default function HomePage() {
   return (
     <main id="main-content" tabIndex={-1} className={styles.page}>
@@ -87,12 +92,12 @@ export default function HomePage() {
               <Link href="/account-center" className={styles.primaryAction}>
                 Open Account Center
               </Link>
-              <Link href="/fish" className={styles.secondaryAction}>
+              <FullDocumentLink href="/fish" className={styles.secondaryAction}>
                 Launch Virtual Fisher
-              </Link>
-              <Link href="/farm" className={styles.secondaryAction}>
+              </FullDocumentLink>
+              <FullDocumentLink href="/farm" className={styles.secondaryAction}>
                 Launch Virtual Farmer
-              </Link>
+              </FullDocumentLink>
             </div>
           </div>
 
@@ -125,9 +130,15 @@ export default function HomePage() {
                 <p className={styles.cardTag}>{card.label}</p>
                 <h3>{card.title}</h3>
                 <p>{card.description}</p>
-                <Link href={card.href} className={styles.cardAction}>
-                  {card.cta}
-                </Link>
+                {isGameRoute(card.href) ? (
+                  <FullDocumentLink href={card.href} className={styles.cardAction}>
+                    {card.cta}
+                  </FullDocumentLink>
+                ) : (
+                  <Link href={card.href} className={styles.cardAction}>
+                    {card.cta}
+                  </Link>
+                )}
               </article>
             ))}
           </div>

@@ -10,10 +10,10 @@ export default function FarmPage() {
   return (
     <GameShellPage
       title="Virtual Farmer"
-      iframeSrc="/farmer-legacy/game.html"
-      iframeTitle="Virtual Farmer"
+      documentPath="/farmer-legacy/game.html"
       alternateHref="/fish"
       alternateLabel="Open Virtual Fisher"
+      runtimeKey="farmer"
     />
   );
 }

@@ -1,6 +1,7 @@
 .page {
   min-height: 100dvh;
   padding: 0.8rem;
+  font-family: var(--font-body), "Segoe UI", sans-serif;
   background:
     radial-gradient(circle at top left, rgba(194, 210, 186, 0.48), transparent 28%),
     radial-gradient(circle at top right, rgba(240, 223, 203, 0.34), transparent 24%),
@@ -145,7 +146,7 @@
   isolation: isolate;
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: clip;
   background: #fefefe;
   min-height: calc(100dvh - 4.8rem);
   box-shadow: var(--shadow-card);
@@ -242,6 +243,34 @@
   color: #355065;
 }
 
+.runtimeMount {
+  width: 100%;
+  min-height: calc(100dvh - 4.8rem);
+}
+
+.runtimeMount[aria-hidden="true"] {
+  visibility: hidden;
+}
+
+.retryLink {
+  align-self: center;
+  margin-top: 0.3rem;
+  padding: 0.64rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: var(--action-secondary);
+  color: var(--action-secondary-text);
+  font-weight: 700;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.retryLink:hover {
+  transform: translateY(-1px);
+  background: var(--action-secondary-hover);
+}
+
 @media (prefers-color-scheme: dark) {
   .pageFisher {
     background:
@@ -332,22 +361,6 @@
   }
 }
 
-.frame {
-  width: 100%;
-  min-height: calc(100dvh - 4.8rem);
-  border: 0;
-  display: block;
-  background: #ffffff;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 220ms ease, transform 240ms ease;
-}
-
-.frameWrapReady .frame {
-  opacity: 1;
-  transform: translateY(0);
-}
-
 @media (max-width: 760px) {
   .page {
     padding: 0.6rem;
@@ -370,7 +383,7 @@
   }
 
   .frameWrap,
-  .frame {
+  .runtimeMount {
     min-height: calc(100dvh - 5rem);
   }
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FullDocumentLink from "@/components/ui/FullDocumentLink";
 
 export default function NotFound() {
   return (
@@ -16,9 +17,9 @@ export default function NotFound() {
           <Link href="/account-center" className="feedbackSecondary">
             Account Center
           </Link>
-          <Link href="/fish" className="feedbackSecondary">
+          <FullDocumentLink href="/fish" className="feedbackSecondary">
             Open Virtual Fisher
-          </Link>
+          </FullDocumentLink>
         </div>
       </div>
     </main>

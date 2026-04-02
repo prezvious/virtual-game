@@ -53,6 +53,7 @@ const CloudSystem = {
     loadInFlight: false,
     lastOfflineNoticeAt: 0,
     realtimeSubscribed: false,
+    intentionalRealtimeClose: false,
     realtimeReconnectTimer: null,
     realtimeReconnectDelayMs: 4000,
     lastRealtimeStatusLogAt: 0,
@@ -1121,8 +1122,15 @@ const CloudSystem = {
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     this.realtimeSubscribed = true;
+                    this.intentionalRealtimeClose = false;
                     this._clearRealtimeReconnect();
                     this.broadcastTabClaim();
+                    return;
+                }
+
+                if (status === 'CLOSED' && this.intentionalRealtimeClose) {
+                    this.realtimeSubscribed = false;
+                    this.intentionalRealtimeClose = false;
                     return;
                 }
 
@@ -1139,12 +1147,15 @@ const CloudSystem = {
         this._clearRealtimeReconnect();
 
         if (this.realtimeChannel && cloudSupabaseClient && typeof cloudSupabaseClient.removeChannel === 'function') {
+            this.intentionalRealtimeClose = true;
             const pending = cloudSupabaseClient.removeChannel(this.realtimeChannel);
             if (pending && typeof pending.catch === 'function') {
                 pending.catch((err) => {
                     console.warn('Failed to remove single-session channel:', err?.message || err);
                 });
             }
+        } else {
+            this.intentionalRealtimeClose = false;
         }
 
         this.realtimeChannel = null;

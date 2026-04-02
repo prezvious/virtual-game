@@ -63,6 +63,68 @@
         localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(payload));
     }
 
+    function getInlineRuntimeContext() {
+        const context = window.__VH_INLINE_RUNTIME_CONTEXT__;
+        if (!context || context.key !== "farmer") {
+            return null;
+        }
+        return context;
+    }
+
+    function toPath(url) {
+        return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function getGameEntryHref() {
+        const context = getInlineRuntimeContext();
+        return context ? context.routePath : "game.html";
+    }
+
+    function getAuthPageHref(pageName, nextTarget = getGameEntryHref()) {
+        const context = getInlineRuntimeContext();
+        if (!context) {
+            const separator = pageName.includes("?") ? "&" : "?";
+            return `${pageName}${separator}next=${encodeURIComponent(nextTarget)}`;
+        }
+
+        const targetUrl = new URL(pageName, `${window.location.origin}${context.staticBasePath}`);
+        if (nextTarget) {
+            targetUrl.searchParams.set("next", nextTarget);
+        }
+        return toPath(targetUrl);
+    }
+
+    function resolveNavigationTarget(target, { authFallback = false } = {}) {
+        const fallback = authFallback ? getAuthPageHref("login.html") : getGameEntryHref();
+        const normalized = String(target || "").trim();
+
+        if (!normalized) {
+            return fallback;
+        }
+        if (/^https?:\/\//i.test(normalized) || normalized.startsWith("//")) {
+            return normalized;
+        }
+        if (normalized.startsWith("/") || normalized.startsWith("#")) {
+            return normalized;
+        }
+        if (normalized === "game.html" || normalized === "./game.html") {
+            return getGameEntryHref();
+        }
+        if (normalized.startsWith("login.html")) {
+            return getAuthPageHref("login.html");
+        }
+        if (normalized.startsWith("signup.html")) {
+            return getAuthPageHref("signup.html");
+        }
+
+        const context = getInlineRuntimeContext();
+        if (!context) {
+            return normalized;
+        }
+
+        return toPath(new URL(normalized, `${window.location.origin}${context.staticBasePath}`));
+    }
+
     function ensureClient() {
         if (client) return client;
 
@@ -315,7 +377,7 @@
             }
 
             if (requireAuth && !activeUser) {
-                const target = redirectTo || "login.html";
+                const target = resolveNavigationTarget(redirectTo, { authFallback: true });
                 window.location.href = target;
             }
 
@@ -327,10 +389,10 @@
         });
     }
 
-    async function redirectIfAuthenticated(target = "game.html") {
+    async function redirectIfAuthenticated(target = getGameEntryHref()) {
         const result = await init();
         if (result.configured && result.user) {
-            window.location.href = target;
+            window.location.href = resolveNavigationTarget(target);
             return true;
         }
         return false;
@@ -508,7 +570,7 @@
 
         setActiveUser(null);
         if (redirectTo) {
-            window.location.href = redirectTo;
+            window.location.href = resolveNavigationTarget(redirectTo, { authFallback: true });
         }
     }
 
@@ -750,6 +812,8 @@
         isConfigured,
         isAuthenticated,
         getCurrentUser,
+        getGameEntryHref,
+        getAuthPageHref,
         getUsername,
         getDisplayName: getPlayerLabel,
         redirectIfAuthenticated,

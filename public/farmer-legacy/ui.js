@@ -854,11 +854,17 @@ function updateSignedInUserPanel() {
     const signupBtn = document.getElementById('signup-btn');
     if (!playerNameEl || !loginBtn || !signupBtn) return;
 
-    const next = encodeURIComponent('game.html');
-    loginBtn.href = `login.html?next=${next}`;
-    signupBtn.href = `signup.html?next=${next}`;
-
     const supabaseApi = window.VirtualFarmerSupabase;
+    const loginHref = supabaseApi && typeof supabaseApi.getAuthPageHref === "function"
+        ? supabaseApi.getAuthPageHref("login.html")
+        : `login.html?next=${encodeURIComponent('game.html')}`;
+    const signupHref = supabaseApi && typeof supabaseApi.getAuthPageHref === "function"
+        ? supabaseApi.getAuthPageHref("signup.html")
+        : `signup.html?next=${encodeURIComponent('game.html')}`;
+
+    loginBtn.href = loginHref;
+    signupBtn.href = signupHref;
+
     if (!supabaseApi || !supabaseApi.isConfigured()) {
         playerNameEl.textContent = 'Local Mode';
         loginBtn.hidden = false;
@@ -1010,7 +1016,9 @@ function setupEventListeners() {
 // ==================== INITIALIZATION ====================
 async function init() {
     const supabaseApi = window.VirtualFarmerSupabase;
-    const redirectTarget = `login.html?next=${encodeURIComponent('game.html')}`;
+    const redirectTarget = supabaseApi && typeof supabaseApi.getAuthPageHref === "function"
+        ? supabaseApi.getAuthPageHref("login.html")
+        : `login.html?next=${encodeURIComponent('game.html')}`;
     let shouldRevealApp = true;
 
     try {

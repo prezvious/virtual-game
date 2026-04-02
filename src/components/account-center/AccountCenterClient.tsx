@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import FullDocumentLink from "@/components/ui/FullDocumentLink";
 import styles from "./account-center.module.css";
 
 type BridgeProjectState = {
@@ -492,9 +493,9 @@ export default function AccountCenterClient() {
             <h2>Virtual Fisher</h2>
             <p>Jump straight into the fishing runtime after your account state is ready.</p>
             <div className={styles.sectionActions}>
-              <Link href="/fish" className={styles.btnPrimary}>
+              <FullDocumentLink href="/fish" className={styles.btnPrimary}>
                 Launch Fisher
-              </Link>
+              </FullDocumentLink>
             </div>
           </article>
 
@@ -503,9 +504,9 @@ export default function AccountCenterClient() {
             <h2>Virtual Farmer</h2>
             <p>Keep farming progression connected to the same platform identity and profile layer.</p>
             <div className={styles.sectionActions}>
-              <Link href="/farm" className={styles.btnPrimary}>
+              <FullDocumentLink href="/farm" className={styles.btnPrimary}>
                 Launch Farmer
-              </Link>
+              </FullDocumentLink>
             </div>
           </article>
         </section>
